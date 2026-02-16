@@ -1051,95 +1051,47 @@ def create_commission_slip(request):
             slip.source = 'standard'  # Set source to identify this was created via create_commission_slip.html
             slip.save()
             
-            # STEP 1: Calculate Total Commission Rate (sum of agent + manager rates)
+            # STEP 1: Calculate Total Commission Rate and Gross Commission
             total_commission_rate = agent_commission_rate + manager_commission_rate
-            
-            # STEP 2: Calculate Total Commission
-            total_commission = adjusted_total * (total_commission_rate / Decimal('100'))
-            
-            # STEP 3: Calculate Total Gross Commission based on Particulars
+            base_commission = adjusted_total * (total_commission_rate / Decimal('100'))
+
             if particulars == 'PARTIAL COMM':
-                total_gross_commission = total_commission * (partial_percentage / Decimal('100'))
+                total_gross_commission = base_commission * (partial_percentage / Decimal('100'))
             else:
-                total_gross_commission = total_commission
-            
-            # Add incentive if applicable
+                total_gross_commission = base_commission
+
             if particulars == 'INCENTIVES':
                 total_gross_commission += incentive_amount
-            
-            # STEP 4: Calculate VATABLE Amount (handle optional VAT Rate)
-            if vat_rate > 0:
-                vat_rate_decimal = vat_rate / Decimal('100')
-                vatable_amount = (total_gross_commission / (Decimal('1') + vat_rate_decimal)).quantize(
-                    Decimal('0.01'), rounding=ROUND_HALF_UP
-                )
-            else:
-                vatable_amount = total_gross_commission
-            
-            # STEP 5: Calculate Tax Deductions (handle optional Withholding Tax Rate)
-            withholding_tax = Decimal('0')
-            vat_share = Decimal('0')
-            
-            if withholding_tax_percentage > 0:
-                withholding_tax = (vatable_amount * (withholding_tax_percentage / Decimal('100'))).quantize(
-                    Decimal('0.01'), rounding=ROUND_HALF_UP
-                )
-            
-            if vat_rate > 0:
-                vat_share = (vatable_amount * Decimal('0.108')).quantize(
-                    Decimal('0.01'), rounding=ROUND_HALF_UP
-                )  # 10.8% VAT Share (only if VAT Rate > 0)
-            
-            total_tax_deductions = withholding_tax + vat_share
-            
-            # STEP 6: Calculate Final Net Commission (this is what gets distributed to positions)
-            final_net_commission = (total_gross_commission - total_tax_deductions).quantize(
-                Decimal('0.01'), rounding=ROUND_HALF_UP
-            )
-            
-            # STEP 7: Create position breakdown based on Final Net Commission distribution
+
+            # STEP 2: Perform VAT-Compliant Calculation
+            vatable_amount = (total_gross_commission / Decimal('1.12')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            withholding_tax = (vatable_amount * Decimal('0.10')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            final_net_commission = (vatable_amount - withholding_tax).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+
+            # STEP 3: Create Position Breakdown
             positions = [
                 {'rate': agent_commission_rate, 'name': 'Sales Agent', 'agent_name': request.POST.get('sales_agent_name'), 'tax_rate': agent_tax_rate},
                 {'rate': manager_commission_rate, 'name': 'Sales Manager', 'agent_name': sales_manager_name, 'tax_rate': manager_tax_rate}
             ]
-            
+
             for position in positions:
-                if position['rate'] > 0 and position['agent_name']:
-                    # Calculate position's proportional share of the Final Net Commission
-                    position_gross_commission = (final_net_commission * (position['rate'] / total_commission_rate)).quantize(
-                        Decimal('0.01'), rounding=ROUND_HALF_UP
-                    )
-                    
-                    # Calculate Withholding Tax using position-specific tax rates
-                    position_tax_rate = position['tax_rate'] / Decimal('100')
-                    position_withholding_tax = (position_gross_commission * position_tax_rate).quantize(
-                        Decimal('0.01'), rounding=ROUND_HALF_UP
-                    )
-                    
-                    # Net Commission for this position (only subtract withholding tax)
-                    position_net_commission = (position_gross_commission - position_withholding_tax).quantize(
-                        Decimal('0.01'), rounding=ROUND_HALF_UP
-                    )
-                    
-                    # Calculate base commission (for record keeping)
-                    base_commission = (adjusted_total * position['rate'] / Decimal('100')).quantize(
-                        Decimal('0.01'), rounding=ROUND_HALF_UP
-                    )
-                    if particulars == 'PARTIAL COMM':
-                        base_commission = (base_commission * (partial_percentage / Decimal('100'))).quantize(
-                            Decimal('0.01'), rounding=ROUND_HALF_UP
-                        )
-                    
-                    # Create commission detail with VAT-compliant calculations
+                if position['rate'] > 0 and total_commission_rate > 0 and position['agent_name']:
+                    proportion = position['rate'] / total_commission_rate
+
+                    # Use final_net_commission as the base for the breakdown gross amount
+                    position_gross = (final_net_commission * proportion).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+                    position_tax = (position_gross * (position['tax_rate'] / Decimal('100'))).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+                    position_net = (position_gross - position_tax).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+
+                    # Create commission detail with accurate, VAT-compliant values
                     CommissionDetail.objects.create(
                         slip=slip,
                         position=position['name'],
                         particulars=particulars,
                         commission_rate=position['rate'],
-                        base_commission=base_commission,
-                        gross_commission=position_gross_commission,  # This now comes from Final Net Commission distribution
-                        withholding_tax=position_withholding_tax,
-                        net_commission=position_net_commission,
+                        gross_commission=position_gross,
+                        withholding_tax=position_tax,
+                        net_commission=position_net,
                         agent_name=position['agent_name'],
                         partial_percentage=partial_percentage,
                         withholding_tax_rate=position['tax_rate'],
@@ -2671,28 +2623,14 @@ def create_commission_slip2(request):
                     incentive_amount = Decimal(request.POST.get('incentive_amount', '0'))
                     total_gross_commission += incentive_amount
                 
-                # Step 4: Calculate VATABLE Amount (handle optional VAT Rate)
-                if vat_rate > 0:
-                    vat_rate_decimal = vat_rate / 100
-                    vatable_amount = total_gross_commission / (1 + vat_rate_decimal)
-                else:
-                    # If VAT Rate is 0 or empty, VATABLE Amount equals Total Gross Commission
-                    vatable_amount = total_gross_commission
+                # Step 4: VAT-Compliant Calculation
+                vatable_amount = total_gross_commission / Decimal('1.12')
                 
-                # Step 5: Calculate Tax Deductions (handle optional Withholding Tax Rate)
-                withholding_tax = Decimal('0')
-                vat_share = Decimal('0')
+                # Step 5: Calculate Withholding Tax
+                withholding_tax_deduction = vatable_amount * (withholding_tax_percentage / 100)
                 
-                if withholding_tax_percentage > 0:
-                    withholding_tax = vatable_amount * (withholding_tax_percentage / 100)
-                
-                if vat_rate > 0:
-                    vat_share = vatable_amount * Decimal('0.108')  # 10.8% VAT Share (only if VAT Rate > 0)
-                
-                total_tax_deductions = withholding_tax + vat_share
-                
-                # Step 6: Calculate Net Commission (Final Payable Amount)
-                final_net_commission = total_gross_commission - total_tax_deductions
+                # Step 6: Calculate Final Net Commission
+                final_net_commission = vatable_amount - withholding_tax_deduction
                 
                 # Now create CommissionDetail records for each position
                 for pos_data in slip._position_data:
@@ -6267,7 +6205,6 @@ def create_commission_slip3(request):
             
             # Store VAT and withholding tax rates in the slip for later use
             slip.vat_rate = vat_rate
-            slip.withholding_tax_percentage = withholding_tax_percentage
             slip.save()
             
             # STEP 1: Calculate Total Commission Rate (sum of all position rates)
@@ -6285,36 +6222,15 @@ def create_commission_slip3(request):
             # Add incentive if applicable
             if particulars == 'INCENTIVES':
                 total_gross_commission += Decimal(request.POST.get('incentive_amount', 0))
-            
-            # STEP 4: Calculate VATABLE Amount (handle optional VAT Rate)
-            if vat_rate > 0:
-                vat_rate_decimal = vat_rate / Decimal('100')
-                vatable_amount = (total_gross_commission / (Decimal('1') + vat_rate_decimal)).quantize(
-                    Decimal('0.01'), rounding=ROUND_HALF_UP
-                )
-            else:
-                vatable_amount = total_gross_commission
-            
-            # STEP 5: Calculate Tax Deductions (handle optional Withholding Tax Rate)
-            withholding_tax = Decimal('0')
-            vat_share = Decimal('0')
-            
-            if withholding_tax_percentage > 0:
-                withholding_tax = (vatable_amount * (withholding_tax_percentage / Decimal('100'))).quantize(
-                    Decimal('0.01'), rounding=ROUND_HALF_UP
-                )
-            
-            if vat_rate > 0:
-                vat_share = (vatable_amount * Decimal('0.108')).quantize(
-                    Decimal('0.01'), rounding=ROUND_HALF_UP
-                )  # 10.8% VAT Share (only if VAT Rate > 0)
-            
-            total_tax_deductions = withholding_tax + vat_share
-            
-            # STEP 6: Calculate Final Net Commission (this is what gets distributed to positions)
-            final_net_commission = (total_gross_commission - total_tax_deductions).quantize(
-                Decimal('0.01'), rounding=ROUND_HALF_UP
-            )
+
+            # STEP 4: VAT-Compliant Calculation
+            vatable_amount = total_gross_commission / Decimal('1.12')
+
+            # STEP 5: Calculate Withholding Tax
+            withholding_tax_deduction = vatable_amount * (withholding_tax_percentage / 100)
+
+            # STEP 6: Calculate Final Net Commission
+            final_net_commission = vatable_amount - withholding_tax_deduction
             
             # STEP 7: Create position breakdown based on Final Net Commission distribution
             positions = [
@@ -6406,22 +6322,6 @@ def commission3(request, slip_id):
     # Get all commission details
     details = CommissionDetail3.objects.filter(slip=slip)
     
-    # Recalculate withholding tax and net commission for each detail using appropriate tax rate
-    for detail in details:
-        if detail.agent_name == slip.sales_agent_name:
-            # Use agent tax rate
-            tax_rate = slip.withholding_tax_rate / 100
-        elif detail.agent_name == slip.supervisor_name:
-            # Use supervisor tax rate
-            tax_rate = slip.supervisor_withholding_tax_rate / 100
-        else:
-            # Use manager tax rate
-            tax_rate = slip.manager_tax_rate / 100
-            
-        # Recalculate withholding tax and net commission
-        detail.withholding_tax = detail.gross_commission * tax_rate
-        detail.net_commission = detail.gross_commission - detail.withholding_tax
-        detail.save()
     
     # Filter details based on user role and permissions first
     user_role = request.user.profile.role
@@ -6471,68 +6371,6 @@ def commission3(request, slip_id):
         # Default: Show sum of visible commission rates
         display_commission_rate = sum(detail.commission_rate for detail in filtered_details)
 
-    # Calculate VAT-compliant values using the same logic as create_commission_slip3
-    total_gross_commission = Decimal('0')
-    vatable_amount = Decimal('0')
-    total_tax_deductions = Decimal('0')
-    final_net_commission = Decimal('0')
-    
-    # Get VAT and withholding tax rates (handle optional values)
-    vat_rate = getattr(slip, 'vat_rate', Decimal('0')) or Decimal('0')
-    withholding_tax_percentage = getattr(slip, 'withholding_tax_percentage', Decimal('0')) or Decimal('0')
-    
-    # Get commission rates for all positions
-    all_details = CommissionDetail3.objects.filter(slip=slip)
-    total_commission_rate = sum(detail.commission_rate for detail in all_details)
-    
-    # Calculate adjusted gross commission (after cash advance)
-    cash_advance_tax = slip.cash_advance * Decimal('0.10')
-    net_cash_advance = slip.cash_advance - cash_advance_tax
-    # Convert float to Decimal to avoid TypeError
-    total_selling_price_decimal = Decimal(str(slip.total_selling_price or 0)).quantize(
-        Decimal('0.01'), rounding=ROUND_HALF_UP
-    )
-    adjusted_gross_comm = (total_selling_price_decimal - net_cash_advance).quantize(
-        Decimal('0.01'), rounding=ROUND_HALF_UP
-    )
-    
-    # Calculate total commission
-    total_commission_rate_decimal = Decimal(str(total_commission_rate))
-    total_commission = adjusted_gross_comm * (total_commission_rate_decimal / Decimal('100'))
-     
-    # Apply particulars percentage
-    first_detail = details.first()
-    if first_detail and first_detail.particulars == 'PARTIAL COMM':
-        partial_percentage_decimal = first_detail.partial_percentage or Decimal('100')
-        total_gross_commission = total_commission * (partial_percentage_decimal / Decimal('100'))
-    else:
-        total_gross_commission = total_commission
-    
-    # Add incentive if applicable
-    if first_detail and first_detail.particulars == 'INCENTIVES':
-        total_gross_commission += slip.incentive_amount or Decimal('0')
-    
-    # Calculate VATABLE Amount (handle optional VAT Rate)
-    if vat_rate > 0:
-        vat_rate_decimal = vat_rate / Decimal('100')
-        vatable_amount = (total_gross_commission / (Decimal('1') + vat_rate_decimal)).quantize(
-            Decimal('0.01'), rounding=ROUND_HALF_UP
-        )
-    else:
-        vatable_amount = total_gross_commission
-    
-    # Calculate tax deductions (handle optional Withholding Tax Rate)
-    withholding_tax = Decimal('0')
-    
-    if withholding_tax_percentage > 0:
-        withholding_tax = (vatable_amount * (withholding_tax_percentage / Decimal('100'))).quantize(
-            Decimal('0.01'), rounding=ROUND_HALF_UP
-        )
-    
-    total_tax_deductions = withholding_tax
-    final_net_commission = (total_gross_commission - total_tax_deductions).quantize(
-        Decimal('0.01'), rounding=ROUND_HALF_UP
-    )
     
     # Get display particulars (descriptive label instead of percentage)
     # Use all_details_for_rate to get the first detail for particulars
@@ -6548,9 +6386,31 @@ def commission3(request, slip_id):
         else:
             display_particulars = "Full Comm"
 
-    return render(request, 'commission3.html', {
+    # VAT-Compliant Calculation for Display
+    total_commission_rate = sum(d.commission_rate for d in all_details_for_rate)
+    net_cash_advance = slip.cash_advance - (slip.cash_advance * Decimal('0.10'))
+    adjusted_total = Decimal(slip.total_selling_price) - net_cash_advance
+    total_commission = adjusted_total * (total_commission_rate / Decimal('100'))
+
+    particulars = first_detail_for_display.particulars if first_detail_for_display else 'FULL COMM'
+    partial_percentage = first_detail_for_display.partial_percentage if first_detail_for_display else Decimal('100')
+
+    if particulars == 'PARTIAL COMM':
+        total_gross_commission = total_commission * (partial_percentage / Decimal('100'))
+    else:
+        total_gross_commission = total_commission
+
+    if particulars == 'INCENTIVES':
+        total_gross_commission += slip.incentive_amount
+
+    vatable_amount = total_gross_commission / Decimal('1.12')
+    withholding_tax_deduction = vatable_amount * (slip.withholding_tax_rate / 100)
+    final_net_commission = vatable_amount - withholding_tax_deduction
+
+    # Prepare context for rendering
+    context = {
         'slip': slip,
-        'details': filtered_details,
+        'details': filtered_details,  # Use filtered details for display
         'total_gross': total_gross,
         'total_tax': total_tax,
         'total_net': total_net,
@@ -6562,9 +6422,11 @@ def commission3(request, slip_id):
         'display_particulars': display_particulars,
         'total_gross_commission': total_gross_commission,
         'vatable_amount': vatable_amount,
-        'total_tax_deductions': total_tax_deductions,
+        'total_tax_deductions': withholding_tax_deduction,
         'final_net_commission': final_net_commission,
-    })
+    }
+
+    return render(request, 'commission3.html', context)
 
 @login_required(login_url='signin')
 def delete_tranche(request, tranche_id):

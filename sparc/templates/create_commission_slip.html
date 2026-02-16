@@ -970,19 +970,19 @@
 
                                     <div>
                                         <div class="calculation-row">
-                                            <span class="calculation-label">1. Commission Rate</span>
+                                            <span class="calculation-label">1. Total Commission Rate (×)</span>
                                             <span class="calculation-value" id="totalCommissionRateDisplay">0.00%</span>
                                         </div>
                                         <div class="calculation-row">
-                                            <span class="calculation-label">2. Gross Commission</span>
+                                            <span class="calculation-label">2. Total Gross Commission</span>
                                             <span class="calculation-value" id="totalGrossCommissionDisplay">₱0.00</span>
                                         </div>
                                         <div class="calculation-row">
-                                            <span class="calculation-label">3. VATABLE Amount</span>
+                                            <span class="calculation-label">3. VATable Amount (÷ 1.12)</span>
                                             <span class="calculation-value" id="vatableAmountDisplay">₱0.00</span>
                                         </div>
                                         <div class="calculation-row">
-                                            <span class="calculation-label">4. Tax Deductions</span>
+                                            <span class="calculation-label">4. Withholding Tax Deduction (− 10%)</span>
                                             <span class="calculation-value" id="totalTaxDeductionsDisplay">₱0.00</span>
                                         </div>
                                         <div class="calculation-row total">
@@ -1087,75 +1087,67 @@
         }
 
         function updateCommissionPreview() {
-            const grossComm = parseFloat(document.getElementById('total_selling_price').value) || 0;
-            const cashAdvance = parseFloat(document.getElementById('cash_advance').value) || 0;
+            const readNumber = (id, fallback = 0) => {
+                const value = parseFloat(document.getElementById(id)?.value);
+                return Number.isFinite(value) ? value : fallback;
+            };
+
+            const totalSellingPrice = readNumber('total_selling_price');
+            const cashAdvance = readNumber('cash_advance');
             const particulars = document.getElementById('particulars').value;
-            const partialPercentage = parseFloat(document.getElementById('partial_percentage').value) || 100;
-            const incentiveAmount = parseFloat(document.getElementById('incentive_amount').value) || 0;
+            const partialPercentage = readNumber('partial_percentage', 100);
+            const incentiveAmount = readNumber('incentive_amount');
             
-            const vatRate = parseFloat(document.getElementById('vat_rate').value) || 0;
-            const withholdingTaxPercentage = parseFloat(document.getElementById('withholding_tax_percentage').value) || 0;
-            
-            const agentTaxRate = parseFloat(document.getElementById('withholding_tax_rate').value) || 10;
-            const managerTaxRate = parseFloat(document.getElementById('manager_tax_rate').value) || 10;
+            const agentRate = readNumber('commission_rate');
+            const managerRate = readNumber('manager_commission_rate');
+            const totalCommissionRate = agentRate + managerRate;
 
-            const cashAdvanceTax = cashAdvance * 0.10;
-            const netCashAdvance = cashAdvance - cashAdvanceTax;
-            const adjustedGrossComm = grossComm - netCashAdvance;
-
-            const positions = [
-                { id: 'commission_rate', name: 'Sales Agent', taxRate: agentTaxRate, is_primary: true },
-                { id: 'manager_commission_rate', name: 'Sales Manager', taxRate: managerTaxRate, is_primary: false }
-            ];
-
-            let totalCommissionRate = 0;
-            positions.forEach(pos => {
-                const rateInput = document.getElementById(pos.id);
-                const rate = parseFloat(rateInput ? rateInput.value : 0) || 0;
-                totalCommissionRate += rate;
-            });
-
-            let totalCommission = adjustedGrossComm * (totalCommissionRate / 100);
+            // Main calculation based on total values
+            let baseCommission = totalSellingPrice * (totalCommissionRate / 100);
             let totalGrossCommission;
 
             if (particulars === 'PARTIAL COMM') {
-                totalGrossCommission = totalCommission * (partialPercentage / 100);
+                totalGrossCommission = baseCommission * (partialPercentage / 100);
             } else {
-                totalGrossCommission = totalCommission;
+                totalGrossCommission = baseCommission;
             }
 
             if (particulars === 'INCENTIVES') {
                 totalGrossCommission += incentiveAmount;
             }
 
-            let vatableAmount = vatRate > 0 ? totalGrossCommission / (1 + vatRate / 100) : totalGrossCommission;
-            let withholdingTax = withholdingTaxPercentage > 0 ? vatableAmount * (withholdingTaxPercentage / 100) : 0;
-            let vatShare = vatRate > 0 ? vatableAmount * 0.108 : 0;
-            const totalTaxDeductions = withholdingTax + vatShare;
-            const finalNetCommission = totalGrossCommission - totalTaxDeductions;
+            const vatableAmount = totalGrossCommission / 1.12;
+            const withholdingTax = vatableAmount * 0.10;
+            const finalNetCommission = vatableAmount - withholdingTax;
 
+            // Update the VAT-Compliant Calculation card
             document.getElementById('totalCommissionRateDisplay').textContent = `${totalCommissionRate.toFixed(2)}%`;
             document.getElementById('totalGrossCommissionDisplay').textContent = `₱${formatCurrency(totalGrossCommission)}`;
             document.getElementById('vatableAmountDisplay').textContent = `₱${formatCurrency(vatableAmount)}`;
-            document.getElementById('totalTaxDeductionsDisplay').textContent = `₱${formatCurrency(totalTaxDeductions)}`;
+            document.getElementById('totalTaxDeductionsDisplay').textContent = `₱${formatCurrency(withholdingTax)}`;
             document.getElementById('finalNetCommissionDisplay').textContent = `₱${formatCurrency(finalNetCommission)}`;
 
-            let totalGrossCommissionSum = 0, totalWithholdingSum = 0, totalNetCommissionSum = 0;
+            // Position Breakdown Calculation
             const tableBody = document.getElementById('previewTableBody');
             tableBody.innerHTML = '';
+            let totalGrossSum = 0, totalTaxSum = 0, totalNetSum = 0;
+
+            const positions = [
+                { name: 'Sales Agent', rate: agentRate, taxRate: readNumber('withholding_tax_rate') },
+                { name: 'Sales Manager', rate: managerRate, taxRate: readNumber('manager_tax_rate') }
+            ];
 
             positions.forEach(pos => {
-                const rateInput = document.getElementById(pos.id);
-                const positionRate = parseFloat(rateInput ? rateInput.value : 0) || 0;
+                if (pos.rate > 0 && totalCommissionRate > 0) {
+                    const positionProportion = pos.rate / totalCommissionRate;
+                    // Use finalNetCommission as the base for the breakdown gross amount
+                    const positionGross = finalNetCommission * positionProportion;
+                    const positionTax = positionGross * (pos.taxRate / 100);
+                    const positionNet = positionGross - positionTax;
 
-                if (positionRate > 0) {
-                    const positionGrossCommission = finalNetCommission * (positionRate / totalCommissionRate);
-                    const withholdingTax = positionGrossCommission * (pos.taxRate / 100);
-                    const positionNetCommission = positionGrossCommission - withholdingTax;
-
-                    totalGrossCommissionSum += positionGrossCommission;
-                    totalWithholdingSum += withholdingTax;
-                    totalNetCommissionSum += positionNetCommission;
+                    totalGrossSum += positionGross;
+                    totalTaxSum += positionTax;
+                    totalNetSum += positionNet;
 
                     let particularsDisplay = particulars === 'PARTIAL COMM' ? `${partialPercentage.toFixed(0)}%` : particulars === 'INCENTIVES' ? 'INCENTIVES' : '100%';
 
@@ -1163,18 +1155,19 @@
                         <tr>
                             <td>${pos.name}</td>
                             <td>${particularsDisplay}</td>
-                            <td>${positionRate}%</td>
-                            <td class="amount">₱${formatCurrency(positionGrossCommission)}</td>
-                            <td class="amount">₱${formatCurrency(withholdingTax)}</td>
-                            <td class="amount">₱${formatCurrency(positionNetCommission)}</td>
+                            <td>${pos.rate.toFixed(2)}%</td>
+                            <td class="amount">₱${formatCurrency(positionGross)}</td>
+                            <td class="amount">₱${formatCurrency(positionTax)}</td>
+                            <td class="amount">₱${formatCurrency(positionNet)}</td>
                         </tr>`;
                     tableBody.innerHTML += row;
                 }
             });
 
-            document.getElementById('totalGrossCommission').textContent = `₱${formatCurrency(totalGrossCommissionSum)}`;
-            document.getElementById('totalTax').textContent = `₱${formatCurrency(totalWithholdingSum)}`;
-            document.getElementById('totalNetCommission').textContent = `₱${formatCurrency(totalNetCommissionSum)}`;
+            // Update breakdown table footer
+            document.getElementById('totalGrossCommission').textContent = `₱${formatCurrency(totalGrossSum)}`;
+            document.getElementById('totalTax').textContent = `₱${formatCurrency(totalTaxSum)}`;
+            document.getElementById('totalNetCommission').textContent = `₱${formatCurrency(totalNetSum)}`;
         }
 
         document.addEventListener('DOMContentLoaded', function() {

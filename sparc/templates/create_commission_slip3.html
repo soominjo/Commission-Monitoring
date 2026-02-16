@@ -1176,27 +1176,28 @@
         }
 
         function updateCommissionPreview() {
-            const grossComm = parseFloat(document.getElementById('total_selling_price').value) || 0;
-            const cashAdvance = parseFloat(document.getElementById('cash_advance').value) || 0;
+            const readNumber = (id, fallback = 0) => {
+                const value = parseFloat(document.getElementById(id)?.value);
+                return Number.isFinite(value) ? value : fallback;
+            };
+
+            const grossComm = readNumber('total_selling_price');
+            const cashAdvance = readNumber('cash_advance');
             const particulars = document.getElementById('particulars').value;
-            const partialPercentage = parseFloat(document.getElementById('partial_percentage').value) || 100;
-            const incentiveAmount = parseFloat(document.getElementById('incentive_amount').value) || 0;
+            const partialPercentage = readNumber('partial_percentage', 100);
+            const incentiveAmount = readNumber('incentive_amount');
             
-            const vatRate = parseFloat(document.getElementById('vat_rate').value) || 0;
-            const withholdingTaxPercentage = parseFloat(document.getElementById('withholding_tax_percentage').value) || 0;
-            
-            const agentTaxRate = parseFloat(document.getElementById('withholding_tax_rate').value) || 10;
-            const supervisorTaxRate = parseFloat(document.getElementById('supervisor_withholding_tax_rate').value) || 10;
-            const managerTaxRate = parseFloat(document.getElementById('manager_tax_rate').value) || 10;
+            const vatRate = readNumber('vat_rate');
+            const withholdingTaxPercentage = readNumber('withholding_tax_percentage');
 
             const cashAdvanceTax = cashAdvance * 0.10;
             const netCashAdvance = cashAdvance - cashAdvanceTax;
             const adjustedGrossComm = grossComm - netCashAdvance;
 
             const positions = [
-                { id: 'agent_commission_rate', name: 'Sales Agent', taxRate: agentTaxRate, is_primary: true },
-                { id: 'supervisor_commission_rate', name: 'Sales Supervisor', taxRate: supervisorTaxRate, is_primary: false },
-                { id: 'manager_commission_rate', name: 'Sales Manager', taxRate: managerTaxRate, is_primary: false }
+                { id: 'agent_commission_rate', name: 'Sales Agent', taxRateInputId: 'withholding_tax_rate', is_primary: true },
+                { id: 'supervisor_commission_rate', name: 'Sales Supervisor', taxRateInputId: 'supervisor_withholding_tax_rate', is_primary: false },
+                { id: 'manager_commission_rate', name: 'Sales Manager', taxRateInputId: 'manager_tax_rate', is_primary: false }
             ];
 
             let totalCommissionRate = 0;
@@ -1219,16 +1220,14 @@
                 totalGrossCommission += incentiveAmount;
             }
 
-            let vatableAmount = vatRate > 0 ? totalGrossCommission / (1 + vatRate / 100) : totalGrossCommission;
-            let withholdingTax = withholdingTaxPercentage > 0 ? vatableAmount * (withholdingTaxPercentage / 100) : 0;
-            let vatShare = vatRate > 0 ? vatableAmount * 0.108 : 0;
-            const totalTaxDeductions = withholdingTax + vatShare;
-            const finalNetCommission = totalGrossCommission - totalTaxDeductions;
+            const vatableAmount = totalGrossCommission / 1.12;
+            const withholdingTaxDeduction = vatableAmount * (withholdingTaxPercentage / 100);
+            const finalNetCommission = vatableAmount - withholdingTaxDeduction;
 
             document.getElementById('totalCommissionRateDisplay').textContent = `${totalCommissionRate.toFixed(2)}%`;
             document.getElementById('totalGrossCommissionDisplay').textContent = `₱${formatCurrency(totalGrossCommission)}`;
             document.getElementById('vatableAmountDisplay').textContent = `₱${formatCurrency(vatableAmount)}`;
-            document.getElementById('totalTaxDeductionsDisplay').textContent = `₱${formatCurrency(totalTaxDeductions)}`;
+            document.getElementById('totalTaxDeductionsDisplay').textContent = `₱${formatCurrency(withholdingTaxDeduction)}`;
             document.getElementById('finalNetCommissionDisplay').textContent = `₱${formatCurrency(finalNetCommission)}`;
 
             let totalGrossCommissionSum = 0, totalWithholdingSum = 0, totalNetCommissionSum = 0;
@@ -1238,10 +1237,11 @@
             positions.forEach(pos => {
                 const rateInput = document.getElementById(pos.id);
                 const positionRate = parseFloat(rateInput ? rateInput.value : 0) || 0;
+                const taxRate = pos.taxRateInputId ? readNumber(pos.taxRateInputId) : 0;
 
-                if (positionRate > 0) {
+                if (positionRate > 0 && totalCommissionRate > 0) {
                     const positionGrossCommission = finalNetCommission * (positionRate / totalCommissionRate);
-                    const withholdingTax = positionGrossCommission * (pos.taxRate / 100);
+                    const withholdingTax = positionGrossCommission * (taxRate / 100);
                     const positionNetCommission = positionGrossCommission - withholdingTax;
 
                     totalGrossCommissionSum += positionGrossCommission;
