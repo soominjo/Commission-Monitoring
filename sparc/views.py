@@ -1064,7 +1064,8 @@ def create_commission_slip(request):
                 total_gross_commission += incentive_amount
 
             # STEP 2: Perform VAT-Compliant Calculation
-            vatable_amount = (total_gross_commission / Decimal('1.12')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            vat_divisor = (Decimal('1') + (vat_rate / Decimal('100')))
+            vatable_amount = (total_gross_commission / vat_divisor).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
             withholding_tax = (vatable_amount * Decimal('0.10')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
             final_net_commission = (vatable_amount - withholding_tax).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
 
@@ -2624,7 +2625,8 @@ def create_commission_slip2(request):
                     total_gross_commission += incentive_amount
                 
                 # Step 4: VAT-Compliant Calculation
-                vatable_amount = total_gross_commission / Decimal('1.12')
+                vat_divisor = Decimal('1') + (vat_rate / Decimal('100'))
+                vatable_amount = total_gross_commission / vat_divisor
                 
                 # Step 5: Calculate Withholding Tax
                 withholding_tax_deduction = vatable_amount * (withholding_tax_percentage / 100)
@@ -6224,7 +6226,8 @@ def create_commission_slip3(request):
                 total_gross_commission += Decimal(request.POST.get('incentive_amount', 0))
 
             # STEP 4: VAT-Compliant Calculation
-            vatable_amount = total_gross_commission / Decimal('1.12')
+            vat_divisor = Decimal('1') + (vat_rate / Decimal('100'))
+            vatable_amount = total_gross_commission / vat_divisor
 
             # STEP 5: Calculate Withholding Tax
             withholding_tax_deduction = vatable_amount * (withholding_tax_percentage / 100)
@@ -6403,8 +6406,14 @@ def commission3(request, slip_id):
     if particulars == 'INCENTIVES':
         total_gross_commission += slip.incentive_amount
 
-    vatable_amount = total_gross_commission / Decimal('1.12')
-    withholding_tax_deduction = vatable_amount * (slip.withholding_tax_rate / 100)
+    # Use getattr to safely handle missing attributes with defaults
+    vat_rate = getattr(slip, 'vat_rate', Decimal('0'))
+    wht_rate = getattr(slip, 'withholding_tax_rate', Decimal('10.00'))
+
+    # VAT-Compliant Calculation
+    vat_divisor = Decimal('1') + (vat_rate / Decimal('100'))
+    vatable_amount = total_gross_commission / vat_divisor
+    withholding_tax_deduction = vatable_amount * (wht_rate / Decimal('100'))
     final_net_commission = vatable_amount - withholding_tax_deduction
 
     # Prepare context for rendering

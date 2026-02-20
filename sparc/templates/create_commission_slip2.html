@@ -1103,7 +1103,8 @@
             totalGrossCommission += incentiveAmount;
         }
 
-        const vatableAmount = totalGrossCommission / 1.12;
+        const vatDivisor = 1 + (vatRate / 100);
+        const vatableAmount = totalGrossCommission / vatDivisor;
         const withholdingTaxDeduction = vatableAmount * (withholdingTaxPercentage / 100);
         const finalNetCommission = vatableAmount - withholdingTaxDeduction;
 

@@ -19,7 +19,7 @@
           colors: {
             primary: '#1d4ed8',
             accent: '#0e7490',
-            dark: '#1e293b'
+            dark: '#1e2 93b'
           }
         }
       }
@@ -294,20 +294,21 @@
             <div class="bg-gray-50 p-3 border-b border-gray-200">
               <h3 class="font-bold text-sm text-gray-600">SUMMARY</h3>
             </div>
+            <input type="hidden" id="invoice-tax-rate" value="{{ invoice.vat_rate }}">
             <div class="p-4 space-y-2 text-sm">
               {% if is_combined_invoice %}
                 <!-- Combined Invoice Summary - Simplified to match Down Payment Schedule -->
                 <div class="flex justify-between">
                   <span class="text-gray-600">Net Commission:</span>
-                  <span class="font-medium text-gray-800">₱ {{ net_price|floatformat:2|intcomma }}</span>
+                  <span id="summary-net-commission" class="font-medium text-gray-800">₱ {{ net_price|floatformat:2|intcomma }}</span>
                 </div>
                 <div class="flex justify-between">
                   <span class="text-gray-600">Less Tax:</span>
-                  <span class="font-medium text-gray-800">₱ {{ vat_amount|floatformat:2|intcomma }}</span>
+                  <span id="summary-less-tax" class="font-medium text-gray-800">₱ {{ vat_amount|floatformat:2|intcomma }}</span>
                 </div>
                 <div class="flex justify-between pt-3 mt-3 border-t-2 border-gray-200">
                   <span class="font-bold text-gray-800">NET COMMISSION PAYABLE:</span>
-                  <span class="font-bold text-blue-600">₱ {{ total_due|floatformat:2|intcomma }}</span>
+                  <span id="summary-net-payable" class="font-bold text-blue-600">₱ {{ total_due|floatformat:2|intcomma }}</span>
                 </div>
               {% else %}
                 <!-- Single Invoice Summary -->
@@ -315,29 +316,29 @@
                   <!-- LTO Invoice Summary -->
                   <div class="flex justify-between">
                     <span class="text-gray-600">LTO Commission:</span>
-                    <span class="font-medium text-gray-800">₱ {{ lto_deduction_value|floatformat:2|intcomma }}</span>
+                    <span id="summary-net-commission" class="font-medium text-gray-800">₱ {{ lto_deduction_value|floatformat:2|intcomma }}</span>
                   </div>
                   <div class="flex justify-between">
                     <span class="text-gray-600">Less: Withholding Tax ({{ invoice.option2_tax_rate|floatformat:0 }}%):</span>
-                    <span class="font-medium text-gray-800">₱ {{ lto_deduction_tax|floatformat:2|intcomma }}</span>
+                    <span id="summary-less-tax" class="font-medium text-gray-800">₱ {{ lto_deduction_tax|floatformat:2|intcomma }}</span>
                   </div>
                   <div class="flex justify-between pt-3 mt-3 border-t-2 border-gray-200">
                     <span class="font-bold text-gray-800">NET COMMISSION PAYABLE:</span>
-                    <span class="font-bold text-blue-600">₱ {{ lto_deduction_net|floatformat:2|intcomma }}</span>
+                    <span id="summary-net-payable" class="font-bold text-blue-600">₱ {{ lto_deduction_net|floatformat:2|intcomma }}</span>
                   </div>
                 {% else %}
                   <!-- DP Invoice Summary - Simplified to match Down Payment Schedule -->
                   <div class="flex justify-between">
                     <span class="text-gray-600">Net Commission:</span>
-                    <span class="font-medium text-gray-800">₱ {{ net_price|floatformat:2|intcomma }}</span>
+                    <span id="summary-net-commission" class="font-medium text-gray-800">₱ {{ net_price|floatformat:2|intcomma }}</span>
                   </div>
                   <div class="flex justify-between">
                     <span class="text-gray-600">Less Tax:</span>
-                    <span class="font-medium text-gray-800">₱ {{ vat_amount|floatformat:2|intcomma }}</span>
+                    <span id="summary-less-tax" class="font-medium text-gray-800">₱ {{ vat_amount|floatformat:2|intcomma }}</span>
                   </div>
                   <div class="flex justify-between pt-3 mt-3 border-t-2 border-gray-200">
                     <span class="font-bold text-gray-800">NET COMMISSION PAYABLE:</span>
-                    <span class="font-bold text-blue-600">₱ {{ total_due|floatformat:2|intcomma }}</span>
+                    <span id="summary-net-payable" class="font-bold text-blue-600">₱ {{ total_due|floatformat:2|intcomma }}</span>
                   </div>
                 {% endif %}
               {% endif %}
@@ -910,6 +911,34 @@ document.addEventListener('DOMContentLoaded', function() {
       const itemsTableBody = document.getElementById('items-table-body');
       let itemCounter = 1;
 
+      // Update total amount calculation and sync Summary section
+      function updateTotalAmount() {
+        const amountInputs = document.querySelectorAll('.item-amount-edit, .amount-input');
+        let total = 0;
+        amountInputs.forEach(input => {
+          const value = parseFloat(input.value) || 0;
+          total += value;
+        });
+        const totalDisplay = document.getElementById('total-amount-display');
+        if (totalDisplay) totalDisplay.textContent = total.toFixed(2);
+
+        // Update Summary section dynamically
+        const taxRateInput = document.getElementById('invoice-tax-rate');
+        const taxRate = taxRateInput ? (parseFloat(taxRateInput.value) || 0) / 100 : 0;
+        const netCommission = total;
+        const lessTax = netCommission * taxRate;
+        const netPayable = netCommission - lessTax;
+
+        const fmt = (v) => '₱ ' + v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+        const elNet = document.getElementById('summary-net-commission');
+        const elTax = document.getElementById('summary-less-tax');
+        const elPay = document.getElementById('summary-net-payable');
+        if (elNet) elNet.textContent = fmt(netCommission);
+        if (elTax) elTax.textContent = fmt(lessTax);
+        if (elPay) elPay.textContent = fmt(netPayable);
+      }
+
       if (editItemsBtn && itemsModal && cancelItemsBtn && closeItemsBtn && saveItemsBtn && itemsForm) {
         const openItemsModal = () => itemsModal.classList.remove('hidden');
         const closeItemsModal = () => itemsModal.classList.add('hidden');
@@ -975,7 +1004,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Remove item functionality
         function attachItemEventListeners(row) {
           const removeBtn = row.querySelector('.remove-item-btn');
-          const amountInput = row.querySelector('.amount-input');
+          const amountInput = row.querySelector('.item-amount-edit, .amount-input');
           const percentageInput = row.querySelector('.percentage-input');
 
           if (removeBtn) {
@@ -996,17 +1025,6 @@ document.addEventListener('DOMContentLoaded', function() {
           if (percentageInput) {
             percentageInput.addEventListener('input', validatePercentage);
           }
-        }
-
-        // Update total amount calculation
-        function updateTotalAmount() {
-          const amountInputs = document.querySelectorAll('.amount-input');
-          let total = 0;
-          amountInputs.forEach(input => {
-            const value = parseFloat(input.value) || 0;
-            total += value;
-          });
-          document.getElementById('total-amount-display').textContent = total.toFixed(2);
         }
 
         // Validate percentage inputs
@@ -1030,7 +1048,15 @@ document.addEventListener('DOMContentLoaded', function() {
           attachItemEventListeners(row);
         });
       }
-      
+
+      // Attach input listeners for inline editing amount fields
+      document.querySelectorAll('.item-amount-edit').forEach(input => {
+        input.addEventListener('input', updateTotalAmount);
+      });
+
+      // Initialize summary values on page load
+      updateTotalAmount();
+
     });
     
   </script>

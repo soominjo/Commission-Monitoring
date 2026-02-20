@@ -1103,7 +1103,10 @@ def _get_invoice_context(invoice, request):
     # Initialize variables that are used throughout the function
     is_lto_invoice = False
     lto_tranches = []
-    
+    lto_deduction_value = Decimal('0.00')
+    lto_deduction_tax = Decimal('0.00')
+    lto_deduction_net = Decimal('0.00')
+
     if is_combined_invoice:
         # Extract tranche IDs from the notes field
         if invoice.notes and "Combined invoice for tranches:" in invoice.notes:
@@ -1390,19 +1393,32 @@ def _get_invoice_context(invoice, request):
                     'invoice_no': prev_invoice.invoice_no,
                 })
 
+    # PRIORITY OVERRIDE: If unit_price is saved (manual edit), use it instead of auto-calc
+    if invoice.unit_price is not None and invoice.unit_price > 0:
+        net_price = invoice.unit_price
+
+        # Recalculate derived values based on the invoice's stored rate
+        current_tax_rate = invoice.vat_rate / Decimal("100")
+        vat_amount = (net_price * current_tax_rate).quantize(Decimal("0.01"))
+        subtotal = (net_price - vat_amount).quantize(Decimal("0.01"))
+
+        if is_lto_invoice:
+            lto_deduction_value = net_price
+            lto_deduction_tax = vat_amount
+            lto_deduction_net = subtotal
+
+        amount_net_vat = net_price
+
     # Calculate totals
     total_due = subtotal
     
-    # Add LTO template variables for direct access
-    lto_deduction_value = Decimal('0.00')
-    lto_deduction_tax = Decimal('0.00') 
-    lto_deduction_net = Decimal('0.00')
-    
+    # For LTO invoices, use auto-calculated values only when no manual override exists
     if is_lto_invoice and invoice.tranche and invoice.tranche.tranche_record:
-        tranche_data = _get_tranche_data_for_invoice(invoice.tranche)
-        lto_deduction_value = tranche_data['net_amount']
-        lto_deduction_tax = tranche_data['tax_amount']
-        lto_deduction_net = tranche_data['expected_commission']
+        if not (invoice.unit_price is not None and invoice.unit_price > 0):
+            tranche_data = _get_tranche_data_for_invoice(invoice.tranche)
+            lto_deduction_value = tranche_data['net_amount']
+            lto_deduction_tax = tranche_data['tax_amount']
+            lto_deduction_net = tranche_data['expected_commission']
     
     context = {
         "invoice": invoice,
