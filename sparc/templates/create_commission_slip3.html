@@ -1055,6 +1055,14 @@
                                         <div class="calculation-row">
                                             <span class="calculation-label">2. Gross Commission</span>
                                             <span class="calculation-value" id="totalGrossCommissionDisplay">₱0.00</span>
+                                            {% if user.is_staff or user.is_superuser %}
+                                            <button type="button" id="editGrossCommBtn" class="ml-2 text-blue-600 hover:text-blue-800 text-xs" title="Edit Gross Commission">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                            <input type="number" id="grossCommOverrideInput" readonly
+                                                   class="hidden ml-2 w-28 px-1 py-0.5 border border-blue-400 rounded text-sm text-right"
+                                                   step="0.01" min="0" placeholder="Override...">
+                                            {% endif %}
                                         </div>
                                         <div class="calculation-row">
                                             <span class="calculation-label">3. VATABLE Amount</span>
@@ -1105,6 +1113,7 @@
 
                             </div>
                         </div>
+                        <input type="hidden" name="staff_gross_commission_override" id="staffGrossOverrideHidden" value="">
                     </form>
 
                     <!-- Back Button -->
@@ -1175,6 +1184,8 @@
             updateCommissionPreview();
         }
 
+        let staffGrossOverride = null;
+
         function updateCommissionPreview() {
             const readNumber = (id, fallback = 0) => {
                 const value = parseFloat(document.getElementById(id)?.value);
@@ -1218,6 +1229,11 @@
 
             if (particulars === 'INCENTIVES') {
                 totalGrossCommission += incentiveAmount;
+            }
+
+            // Use staff override if one has been set
+            if (staffGrossOverride !== null) {
+                totalGrossCommission = staffGrossOverride;
             }
 
             const vatDivisor = 1 + (vatRate / 100);
@@ -1292,6 +1308,48 @@
             document.getElementById('agent_select').addEventListener('change', updateAgentInfo);
             document.getElementById('supervisor_id').addEventListener('change', updateSupervisorDetails);
             document.getElementById('manager_id').addEventListener('change', updateManagerDetails);
+
+            // Staff override for Gross Commission
+            const editGrossBtn = document.getElementById('editGrossCommBtn');
+            const grossOverrideInput = document.getElementById('grossCommOverrideInput');
+            if (editGrossBtn && grossOverrideInput) {
+                editGrossBtn.addEventListener('click', function() {
+                    const currentVal = staffGrossOverride !== null
+                        ? staffGrossOverride
+                        : parseFloat(document.getElementById('totalGrossCommissionDisplay').textContent.replace(/[₱,]/g, '')) || 0;
+                    grossOverrideInput.value = currentVal.toFixed(2);
+                    grossOverrideInput.removeAttribute('readonly');
+                    grossOverrideInput.classList.remove('hidden');
+                    editGrossBtn.classList.add('hidden');
+                    grossOverrideInput.focus();
+                    grossOverrideInput.select();
+                });
+
+                const saveOverride = function() {
+                    const val = parseFloat(grossOverrideInput.value);
+                    if (!isNaN(val) && val >= 0) {
+                        staffGrossOverride = val;
+                        document.getElementById('staffGrossOverrideHidden').value = val.toFixed(2);
+                    }
+                    grossOverrideInput.classList.add('hidden');
+                    editGrossBtn.classList.remove('hidden');
+                    updateCommissionPreview();
+                };
+
+                grossOverrideInput.addEventListener('blur', saveOverride);
+                grossOverrideInput.addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        saveOverride();
+                    } else if (e.key === 'Escape') {
+                        staffGrossOverride = null;
+                        document.getElementById('staffGrossOverrideHidden').value = '';
+                        grossOverrideInput.classList.add('hidden');
+                        editGrossBtn.classList.remove('hidden');
+                        updateCommissionPreview();
+                    }
+                });
+            }
         });
     </script>
 </body>

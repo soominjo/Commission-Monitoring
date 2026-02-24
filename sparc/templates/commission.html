@@ -289,11 +289,11 @@
                         <td class="p-2 border">
                             <div class="editable-gross-commission" data-detail-id="{{ detail.id }}" data-commission-type="commission">
                                 <span class="gross-commission-display">₱{{ detail.gross_commission|floatformat:2|intcomma }}</span>
-                                {% if user.is_superuser %}
-                                <input type="number" 
-                                       class="gross-commission-input hidden w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
-                                       value="{{ detail.gross_commission|floatformat:2 }}" 
-                                       step="0.01" 
+                                {% if user.is_superuser or user.is_staff %}
+                                <input type="number"
+                                       class="gross-commission-input hidden w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                       value="{{ detail.gross_commission|floatformat:2 }}"
+                                       step="0.01"
                                        min="0">
                                 <button class="edit-gross-commission-btn text-blue-600 hover:text-blue-800 ml-2 text-xs" title="Edit Gross Commission">
                                     <i class="fas fa-edit"></i>
@@ -334,11 +334,11 @@
                         <td class="p-2 border">
                             <div class="editable-gross-commission" data-detail-id="{{ detail.id }}" data-commission-type="commission">
                                 <span class="gross-commission-display">₱{{ detail.gross_commission|floatformat:2|intcomma }}</span>
-                                {% if user.is_superuser %}
-                                <input type="number" 
-                                       class="gross-commission-input hidden w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
-                                       value="{{ detail.gross_commission|floatformat:2 }}" 
-                                       step="0.01" 
+                                {% if user.is_superuser or user.is_staff %}
+                                <input type="number"
+                                       class="gross-commission-input hidden w-full px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                       value="{{ detail.gross_commission|floatformat:2 }}"
+                                       step="0.01"
                                        min="0">
                                 <button class="edit-gross-commission-btn text-blue-600 hover:text-blue-800 ml-2 text-xs" title="Edit Gross Commission">
                                     <i class="fas fa-edit"></i>
@@ -356,17 +356,18 @@
                 {% endif %}
             {% endfor %}
             
+            {% if not is_receivable_view and not is_tranche_view %}
             {% if user.is_staff or user.is_superuser or user.profile.role == 'Sales Manager' %}
             <tr class="bg-gray-50 font-semibold">
                 <td colspan="3" class="p-2 border text-right">Total:</td>
                 <td class="p-2 border">
                     <div class="editable-total-gross-commission inline-flex items-center justify-center">
                         <span class="total-gross-commission-display">₱{{ total_gross|floatformat:2|intcomma }}</span>
-                        {% if user.is_superuser %}
-                        <input type="number" 
-                               class="total-gross-commission-input hidden w-32 px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-center font-bold" 
-                               value="{{ total_gross|floatformat:2 }}" 
-                               step="0.01" 
+                        {% if user.is_superuser or user.is_staff %}
+                        <input type="number"
+                               class="total-gross-commission-input hidden w-32 px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-center font-bold"
+                               value="{{ total_gross|floatformat:2 }}"
+                               step="0.01"
                                min="0">
                         <button class="edit-total-gross-commission-btn text-blue-600 hover:text-blue-800 ml-2 text-xs" title="Edit Total Gross Commission">
                             <i class="fas fa-edit"></i>
@@ -378,13 +379,14 @@
                 <td class="p-2 border total-net-display">₱{{ total_net|floatformat:2|intcomma }}</td>
             </tr>
             {% endif %}
+            {% endif %}
             </tbody>
         </table>
     </div>
 
     <div class="mt-6 text-center text-gray-700 text-xs sm:text-sm space-y-2">
-        <p>Prepared by: <span class="font-semibold">Shiela Mae F. Fajutagana</span> (Accounting Staff)</p>
-        <p>Checked by: <span class="font-semibold">Gabriel V. Libacao Jr.</span> (Chief Executive Officer)</p>
+        <p>Prepared by: <span class="font-semibold">{{ slip.created_by.get_full_name }}</span> (Accounting Staff)</p>
+        <p>Approved by: <span class="font-semibold">Gabriel V. Libacao Jr.</span> (Chief Executive Officer)</p>
         <p>Received by: <span class="font-semibold">{{ slip.sales_agent_name }}</span></p>
         
         <!-- Signature Area -->
@@ -612,7 +614,7 @@
         const details = [];
         document.querySelectorAll('.editable-gross-commission').forEach(container => {
             const detailId = container.dataset.detailId;
-            const rateCell = container.closest('tr').querySelector('td:nth-child(4)');
+            const rateCell = container.closest('tr').querySelector('td:nth-child(3)');
             const commissionRate = parseFloat(rateCell.textContent.replace('%', '')) || 0;
             
             if (commissionRate > 0) {

@@ -123,10 +123,11 @@ class CommissionSlip(models.Model):
     sales_manager_name = models.CharField(max_length=100, null=True, blank=True)
     manager_commission_rate = models.DecimalField(max_digits=5, decimal_places=2, default=0)
     signature = models.ImageField(upload_to='signatures/', null=True, blank=True)
+    is_approved = models.BooleanField(default=False)
 
     def __str__(self):
         return f"Commission Slip for {self.sales_agent_name}"
-    
+
 class CommissionSlip2(models.Model):
     total_selling_price_manager = models.DecimalField(max_digits=12, decimal_places=2)
     operation_manager_rate = models.DecimalField(max_digits=5, decimal_places=2)
@@ -344,6 +345,7 @@ class CommissionSlip3(models.Model):
     supervisor_withholding_tax_rate = models.DecimalField(max_digits=5, decimal_places=2, default=10.00)  # New supervisor tax rate
     signature = models.ImageField(upload_to='signatures/', null=True, blank=True)
     source = models.CharField(max_length=50, default='standard', help_text="Source of the commission slip (e.g., 'standard', 'manual_breakdown')")
+    is_approved = models.BooleanField(default=False)
 
     def __str__(self):
         return f"Commission Slip for {self.sales_agent_name} with Supervisor {self.supervisor_name}"

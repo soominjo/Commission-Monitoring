@@ -241,7 +241,7 @@
               </td>
               <td class="p-3 text-right font-semibold text-gray-800 border-b border-gray-200 item-view">
                 <span class="item-amount-display">₱{{ item.amount|floatformat:2|intcomma }}</span>
-                <input type="number" step="0.01" class="item-amount-edit hidden w-full px-1 py-0.5 text-xs border border-gray-300 rounded text-right" value="{{ item.amount }}">
+                <input type="number" step="0.01" class="item-amount-edit hidden w-full px-1 py-0.5 text-xs border border-gray-300 rounded text-right" value="{{ item.amount }}" data-orig-amount="{{ item.amount }}" data-orig-percentage="{{ item.percentage|default:0 }}">
               </td>
               <td class="p-3 text-center border-b border-gray-200 item-view">
                 <span class="item-due-date-display">{{ invoice.due_date|date:'M d, Y' }}</span>
@@ -268,14 +268,6 @@
               </td>
             </tr>
           {% endfor %}
-          <!-- Add Item Button Row (hidden by default, shown in edit mode) -->
-          <tr id="add-item-row" class="bg-gray-50 hidden">
-            <td colspan="7" class="p-3 text-center border-b border-gray-200">
-              <button type="button" id="add-item-btn" class="px-4 py-2 bg-green-500 hover:bg-green-600 text-white text-xs font-semibold rounded transition">
-                <i class="fas fa-plus mr-1"></i> Add Item
-              </button>
-            </td>
-          </tr>
         </tbody>
       </table>
     </section>
@@ -519,8 +511,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const editSections = document.querySelectorAll('.edit-section');
         const editControls = document.getElementById('edit-controls');
         const editBtnText = document.getElementById('edit-btn-text');
-        const addItemRow = document.getElementById('add-item-row');
-        
+
         if (isEditMode) {
             storeOriginalData();
             editSections.forEach(section => {
@@ -540,7 +531,6 @@ document.addEventListener('DOMContentLoaded', function() {
             });
             
             editControls.classList.remove('hidden');
-            addItemRow.classList.remove('hidden');
             editBtnText.textContent = 'Cancel Edit';
         } else {
             editSections.forEach(section => {
@@ -560,7 +550,6 @@ document.addEventListener('DOMContentLoaded', function() {
             });
             
             editControls.classList.add('hidden');
-            addItemRow.classList.add('hidden');
             editBtnText.textContent = 'Edit Invoice';
         }
     }
@@ -703,62 +692,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Add new item row
-    function addItemRow() {
-        const tbody = document.getElementById('items-table-body');
-        const itemCount = tbody.querySelectorAll('.item-row').length + 1;
-        const newRow = document.createElement('tr');
-        newRow.className = 'bg-white item-row';
-        newRow.setAttribute('data-item-id', itemCount);
-        
-        newRow.innerHTML = `
-            <td class="p-3 border-b border-gray-200 item-view">
-                <span class="item-code-display">NEW</span>
-                <input type="text" class="item-code-edit hidden w-full px-1 py-0.5 text-xs border border-gray-300 rounded" value="NEW">
-            </td>
-            <td class="p-3 border-b border-gray-200 item-view">
-                <span class="item-description-display">New Item</span>
-                <textarea class="item-description-edit hidden w-full px-1 py-0.5 text-xs border border-gray-300 rounded" rows="2">New Item</textarea>
-            </td>
-            <td class="p-3 text-center border-b border-gray-200 item-view">
-                <span class="item-quantity-display">1</span>
-                <input type="number" class="item-quantity-edit hidden w-full px-1 py-0.5 text-xs border border-gray-300 rounded text-center" value="1">
-            </td>
-            <td class="p-3 text-right font-semibold text-gray-800 border-b border-gray-200 item-view">
-                <span class="item-amount-display">₱ 0.00</span>
-                <input type="number" step="0.01" class="item-amount-edit hidden w-full px-1 py-0.5 text-xs border border-gray-300 rounded text-right" value="0">
-            </td>
-            <td class="p-3 text-center border-b border-gray-200 item-view">
-                <span class="item-due-date-display">-</span>
-                <input type="date" class="item-due-date-edit hidden w-full px-1 py-0.5 text-xs border border-gray-300 rounded" value="">
-            </td>
-            <td class="p-3 text-center border-b border-gray-200 item-view">
-                <span class="item-status-display">
-                    <span class="inline-block px-2 py-0.5 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">Pending</span>
-                </span>
-                <select class="item-status-edit hidden w-full px-1 py-0.5 text-xs border border-gray-300 rounded">
-                    <option value="Pending" selected>Pending</option>
-                    <option value="Received">Received</option>
-                    <option value="Overdue">Overdue</option>
-                </select>
-            </td>
-            <td class="p-3 text-center font-medium border-b border-gray-200 item-view">
-                <span class="item-percentage-display">0.00%</span>
-                <input type="number" step="0.01" min="0" max="100" class="item-percentage-edit hidden w-full px-1 py-0.5 text-xs border border-gray-300 rounded text-center" value="0">
-            </td>
-            <td class="p-3 text-center border-b border-gray-200">
-                <button type="button" onclick="removeItemRow(this)" class="text-red-600 hover:text-red-800 text-sm font-medium edit-mode-only hidden">
-                    Remove
-                </button>
-            </td>
-        `;
-        
-        tbody.appendChild(newRow);
-        
-        // Show edit fields for the new row
-        toggleEditMode();
-    };
-
     document.getElementById('save-all-btn').addEventListener('click', saveAllChanges);
     
     // Event Listeners
@@ -774,9 +707,8 @@ document.addEventListener('DOMContentLoaded', function() {
         toggleEditMode();
     });
     
-    document.getElementById('add-item-btn').addEventListener('click', addItemRow);
-
     });
+
 </script>
 
   
@@ -939,6 +871,24 @@ document.addEventListener('DOMContentLoaded', function() {
         if (elPay) elPay.textContent = fmt(netPayable);
       }
 
+      // Recalculate the percentage column when the amount is edited manually.
+      // Formula: newPct = (newAmount / origAmount) * origPct
+      function recalcPercentageFromAmount(amountInput) {
+        const origAmount = parseFloat(amountInput.dataset.origAmount) || 0;
+        const origPercentage = parseFloat(amountInput.dataset.origPercentage) || 0;
+        if (origAmount > 0) {
+          const newAmount = parseFloat(amountInput.value) || 0;
+          const newPercentage = (newAmount / origAmount) * origPercentage;
+          const row = amountInput.closest('.item-row');
+          if (row) {
+            const pctInput = row.querySelector('.item-percentage-edit');
+            if (pctInput) pctInput.value = newPercentage.toFixed(2);
+            const pctDisplay = row.querySelector('.item-percentage-display');
+            if (pctDisplay) pctDisplay.textContent = newPercentage.toFixed(2) + '%';
+          }
+        }
+      }
+
       if (editItemsBtn && itemsModal && cancelItemsBtn && closeItemsBtn && saveItemsBtn && itemsForm) {
         const openItemsModal = () => itemsModal.classList.remove('hidden');
         const closeItemsModal = () => itemsModal.classList.add('hidden');
@@ -1001,25 +951,15 @@ document.addEventListener('DOMContentLoaded', function() {
           });
         }
 
-        // Remove item functionality
         function attachItemEventListeners(row) {
-          const removeBtn = row.querySelector('.remove-item-btn');
           const amountInput = row.querySelector('.item-amount-edit, .amount-input');
           const percentageInput = row.querySelector('.percentage-input');
 
-          if (removeBtn) {
-            removeBtn.addEventListener('click', () => {
-              if (itemsTableBody.children.length > 1) {
-                row.remove();
-                updateTotalAmount();
-              } else {
-                alert('At least one item is required.');
-              }
-            });
-          }
-
           if (amountInput) {
-            amountInput.addEventListener('input', updateTotalAmount);
+            amountInput.addEventListener('input', () => {
+              recalcPercentageFromAmount(amountInput);
+              updateTotalAmount();
+            });
           }
 
           if (percentageInput) {
@@ -1051,7 +991,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
       // Attach input listeners for inline editing amount fields
       document.querySelectorAll('.item-amount-edit').forEach(input => {
-        input.addEventListener('input', updateTotalAmount);
+        input.addEventListener('input', () => {
+          recalcPercentageFromAmount(input);
+          updateTotalAmount();
+        });
       });
 
       // Initialize summary values on page load

@@ -1450,7 +1450,7 @@ def _get_invoice_context(invoice, request):
     # Permissions
     can_edit_bill_to = request.user.is_staff
     can_check = request.user.is_staff
-    can_approve = request.user.is_superuser
+    can_approve = request.user.is_superuser or request.user.is_staff
     can_prepare = request.user == invoice.prepared_by
     
     # Add signature URLs (uploaded or default)
@@ -1512,9 +1512,9 @@ def _get_invoice_context(invoice, request):
 
     # If no stored items, create default item data
     if not stored_items:
-        # For LTO invoices, the line item amount should be the total due (lto_deduction_net)
-        # For DP invoices, it should be the subtotal (which is also the total due)
-        line_item_amount = lto_deduction_net if is_lto_invoice else subtotal
+        # Use pre-tax "Net Commission" values so the summary section can apply
+        # the "Less Tax" deduction once without double-counting.
+        line_item_amount = lto_deduction_value if is_lto_invoice else net_price
 
         stored_items = [{
             'item_code': 'COMBINED DPC' if is_combined_invoice else ('LTO' if is_lto_invoice else 'DPC'),
@@ -2160,7 +2160,12 @@ def update_invoice(request, invoice_id):
     """Unified view to handle all invoice updates: bill-to info, billing details, and items."""
     if request.method == 'POST':
         invoice = get_object_or_404(BillingInvoice, pk=invoice_id)
-        
+
+        # Only staff and superusers are authorised to save invoice changes
+        if not (request.user.is_superuser or request.user.is_staff):
+            messages.error(request, 'You do not have permission to edit invoices.')
+            return redirect('invoice_view', invoice_id=invoice_id)
+
         # Debug: Log all POST data
         print(f"DEBUG: POST data for invoice {invoice_id}:")
         for key, value in request.POST.items():
@@ -2322,7 +2327,7 @@ def update_invoice(request, invoice_id):
                             tranche_payment.save()
             
             # Save the invoice without triggering recalculations
-            invoice.save(update_fields=['client_name', 'client_address', 'client_tin', 'issue_date', 'due_date', 'reference_no', 'notes'])
+            invoice.save(update_fields=['client_name', 'client_address', 'client_tin', 'issue_date', 'due_date', 'reference_no', 'notes', 'unit_price', 'qty'])
             print(f"DEBUG: Invoice saved with preserved unit_price: {invoice.unit_price}, vat_rate: {invoice.vat_rate}")
             
             # Success message

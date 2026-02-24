@@ -599,17 +599,18 @@ def export_top5_excel(request):
 
 def profile(request):
     # Get commission records (using Commission model instead of Sale)
-    if request.user.is_superuser:
+    if request.user.is_superuser or request.user.is_staff:
         commissions_list = Commission.objects.all().order_by('-date_released')
     else:
         commissions_list = Commission.objects.filter(agent=request.user).order_by('-date_released')
     
     # Get commission slips for the current user
-    if request.user.is_superuser or request.user.profile.role == 'Sales Manager':
+    if request.user.is_superuser or request.user.is_staff or request.user.profile.role == 'Sales Manager':
         commission_slips = CommissionSlip.objects.all().order_by('-date')
     else:
         commission_slips = CommissionSlip.objects.filter(
-            sales_agent_name=request.user.get_full_name()
+            sales_agent_name=request.user.get_full_name(),
+            is_approved=True
         ).order_by('-date')
     
     # Calculate commission summary from commission records
@@ -632,7 +633,7 @@ def profile(request):
     developers = Developer.objects.all().order_by('name')
     # Get commission data from receivables
     # Get commission data from receivables
-    if request.user.is_superuser:
+    if request.user.is_superuser or request.user.is_staff:
         commissions = Commission.objects.all().order_by('-date_released')
         tranche_records = TrancheRecord.objects.all()
     else:
@@ -1049,6 +1050,7 @@ def create_commission_slip(request):
             slip.vat_rate = vat_rate
             slip.withholding_tax_percentage = withholding_tax_percentage
             slip.source = 'standard'  # Set source to identify this was created via create_commission_slip.html
+            slip.is_approved = False
             slip.save()
             
             # STEP 1: Calculate Total Commission Rate and Gross Commission
@@ -1062,6 +1064,15 @@ def create_commission_slip(request):
 
             if particulars == 'INCENTIVES':
                 total_gross_commission += incentive_amount
+
+            # Allow staff/superuser to override the gross commission amount
+            if request.user.is_staff or request.user.is_superuser:
+                staff_override = request.POST.get('staff_gross_commission_override', '').strip()
+                if staff_override:
+                    try:
+                        total_gross_commission = Decimal(staff_override)
+                    except (ValueError, InvalidOperation):
+                        pass  # Fall back to the calculated value
 
             # STEP 2: Perform VAT-Compliant Calculation
             vat_divisor = (Decimal('1') + (vat_rate / Decimal('100')))
@@ -1258,30 +1269,30 @@ def commission_history(request):
         # Superusers and staff can see all commission slips
         pass
     elif request.user.profile.role == 'Sales Manager':
-        # Sales Managers can only see commission slips where they are assigned as the sales manager
+        # Sales Managers can only see approved commission slips where they are assigned as the sales manager
         user_full_name = request.user.get_full_name()
         commission_slips = commission_slips.filter(
             Q(sales_manager_name=user_full_name) |  # Slips where they are the assigned sales manager
             Q(sales_agent_name=user_full_name) |   # Their own slips if they are also an agent
             Q(created_by=request.user)             # Slips they created themselves
-        )
+        ).filter(is_approved=True)
         commission_slips3 = commission_slips3.filter(
             Q(manager_name=user_full_name) |       # Slips where they are the assigned manager
             Q(sales_agent_name=user_full_name) |   # Their own slips if they are also an agent
             Q(supervisor_name=user_full_name) |    # Their own slips if they are also a supervisor
             Q(created_by=request.user)             # Slips they created themselves
-        )
+        ).filter(is_approved=True)
     else:
-        # Regular users can only see their own commission slips
+        # Regular users can only see their own approved commission slips
         commission_slips = commission_slips.filter(
             Q(sales_agent_name=request.user.get_full_name()) |
             Q(created_by=request.user)
-        )
+        ).filter(is_approved=True)
         commission_slips3 = commission_slips3.filter(
             Q(sales_agent_name=request.user.get_full_name()) |
             Q(supervisor_name=request.user.get_full_name()) |
             Q(created_by=request.user)
-        )
+        ).filter(is_approved=True)
 
     # Apply user/team filters post-permission scoping
     selected_user_name = None
@@ -1505,6 +1516,15 @@ def commission_history(request):
             commission_details3.aggregate(total=models.Sum('gross_commission'))['total'] or 0
         )
         total_gross_commission = user_commission
+
+    # Apply approval status filter (for staff/superusers)
+    if status_filter and (request.user.is_superuser or request.user.is_staff):
+        if status_filter == 'approved':
+            commission_slips = commission_slips.filter(is_approved=True)
+            commission_slips3 = commission_slips3.filter(is_approved=True)
+        elif status_filter == 'pending':
+            commission_slips = commission_slips.filter(is_approved=False)
+            commission_slips3 = commission_slips3.filter(is_approved=False)
 
     # Count commission types
     regular_commission_count = commission_slips.filter(is_full_breakdown=False).count()
@@ -2132,16 +2152,8 @@ def commission2(request, slip_id):
         return redirect('home')
 
     # Filter details based on user role and permissions
-    if request.user.is_superuser:
-        # Superusers can see all details
-        details = CommissionDetail.objects.filter(slip=slip)
-    elif request.user.is_staff and hasattr(request.user, 'profile') and request.user.profile.role == 'Sales Manager':
-        # Sales Managers can see sales-related positions only (hide management positions)
-        # Use exclude approach to be more explicit about hiding management positions
-        management_positions = ['Operations Manager', 'Operation Manager', 'Co-Founder', 'Cofounder', 'Co Founder', 'Founder', 'Funds']
-        details = CommissionDetail.objects.filter(slip=slip).exclude(position__in=management_positions)
-    elif request.user.is_staff:
-        # Other staff can see all details
+    if request.user.is_superuser or request.user.is_staff:
+        # Superusers and staff can see all details
         details = CommissionDetail.objects.filter(slip=slip)
     else:
         # Only show the detail for the user's role and name
@@ -2152,15 +2164,9 @@ def commission2(request, slip_id):
         )
 
     # Get slips based on user role
-    if request.user.is_superuser:
-        # Superusers can see all slips
+    if request.user.is_superuser or request.user.is_staff:
+        # Superusers and staff can see all slips
         all_slips = CommissionSlip.objects.all().order_by('-id')
-    elif request.user.is_staff:
-        # Staff can see all slips they created or where they are the agent
-        all_slips = CommissionSlip.objects.filter(
-            Q(created_by=request.user) | 
-            Q(sales_agent_name=request.user.get_full_name())
-        ).order_by('-id')
     else:
         # Others can only see their own slips
         all_slips = CommissionSlip.objects.filter(
@@ -2176,12 +2182,9 @@ def commission2(request, slip_id):
     # Always get all details for commission rate calculation to ensure accuracy
     all_details_for_rate = CommissionDetail.objects.filter(slip=slip)
     
-    if request.user.is_superuser:
-        # Superuser: Show total commission rate (sum of all position rates)
+    if request.user.is_superuser or request.user.is_staff:
+        # Superuser/Staff: Show total commission rate (sum of all position rates)
         display_commission_rate = sum(detail.commission_rate for detail in all_details_for_rate)
-    elif request.user.is_staff and hasattr(request.user, 'profile') and request.user.profile.role == 'Sales Manager':
-        # Sales Manager: Show sum of visible details (excluding management positions)
-        display_commission_rate = sum(detail.commission_rate for detail in details)
     else:
         # Other roles: Show sum of their visible commission rates
         display_commission_rate = sum(detail.commission_rate for detail in details)
@@ -2259,12 +2262,12 @@ def update_gross_commission(request):
                 'message': 'Invalid gross commission value. Please enter a valid number.'
             }, status=400)
         
-        # Check if user is superuser (only superusers can edit gross commission)
-        if not request.user.is_superuser:
-            logger.warning(f"Non-superuser {request.user.username} attempted to edit gross commission")
+        # Check if user is superuser or staff
+        if not (request.user.is_superuser or request.user.is_staff):
+            logger.warning(f"Unauthorized user {request.user.username} attempted to edit gross commission")
             return JsonResponse({
-                'status': 'error', 
-                'message': 'Only superusers can edit gross commission amounts'
+                'status': 'error',
+                'message': 'Only superusers and staff can edit gross commission amounts'
             }, status=403)
         
         # Get the appropriate commission detail based on type
@@ -2374,12 +2377,12 @@ def update_total_gross_commission(request):
                 'message': 'Invalid total gross commission value. Please enter a valid number.'
             }, status=400)
         
-        # Check if user is superuser
-        if not request.user.is_superuser:
-            logger.warning(f"Non-superuser {request.user.username} attempted to edit total gross commission")
+        # Check if user is superuser or staff
+        if not (request.user.is_superuser or request.user.is_staff):
+            logger.warning(f"Unauthorized user {request.user.username} attempted to edit total gross commission")
             return JsonResponse({
                 'status': 'error',
-                'message': 'Only superusers can edit total gross commission amounts'
+                'message': 'Only superusers and staff can edit total gross commission amounts'
             }, status=403)
         
         # Calculate sum of all commission rates
@@ -2527,12 +2530,13 @@ def create_commission_slip2(request):
 
         slip_form = CommissionSlipForm(post_data)
         if slip_form.is_valid():
-            particulars = slip_form.cleaned_data.get('particulars')
+            particulars = (request.POST.get('particulars[]') or request.POST.get('particulars', 'FULL COMM')).strip()
             slip = slip_form.save(commit=False)
             slip.created_by = request.user
             slip.is_full_breakdown = True
             slip.source = 'full_breakdown'  # Set the source
             slip.position = request.POST.get('position', '')
+            slip.is_approved = False
             slip.save()
 
             # Get VAT-compliant calculation parameters
@@ -2607,7 +2611,9 @@ def create_commission_slip2(request):
             if hasattr(slip, '_position_data'):
                 # Step 1: Calculate Total Commission Rate (sum of all position rates)
                 total_commission_rate = sum(pos['rate'] for pos in slip._position_data)
-                
+                slip.commission_rate = float(total_commission_rate)
+                slip.save()
+
                 # Step 2: Calculate Total Commission first
                 total_commission = adjusted_net_selling_price * (total_commission_rate / 100)
                 
@@ -2828,7 +2834,26 @@ def delete_commission_slip(request, slip_id):
             messages.success(request, 'Commission slip deleted successfully.')
         except Exception as e:
             messages.error(request, f'Error deleting commission slip: {str(e)}')
-        
+
+    return redirect('commission_history')
+
+
+@login_required
+@require_http_methods(["POST"])
+def approve_commission_slip(request, slip_id, slip_type):
+    """Approve a pending commission slip. Only staff and superusers can approve."""
+    if not (request.user.is_superuser or request.user.is_staff):
+        messages.error(request, 'You do not have permission to approve commission slips.')
+        return redirect('commission_history')
+
+    if slip_type == 'supervisor_agent':
+        slip = get_object_or_404(CommissionSlip3, id=slip_id)
+    else:
+        slip = get_object_or_404(CommissionSlip, id=slip_id)
+
+    slip.is_approved = True
+    slip.save()
+    messages.success(request, f'Commission slip for {slip.sales_agent_name} has been approved.')
     return redirect('commission_history')
 
 
@@ -3615,7 +3640,13 @@ def view_receivable_voucher(request, release_number):
     class MockCommissionDetail:
         def __init__(self, commission_entry, tranche_data):
             self.position = 'Sales Agent'
-            self.particulars = 'COMMISSION'
+            rn = commission_entry.release_number or ''
+            if 'COMBINED' in rn:
+                self.particulars = 'COMBINED TRANCHES'
+            elif 'LTO' in rn:
+                self.particulars = 'LOAN TAKE OUT'
+            else:
+                self.particulars = 'DOWN PAYMENT'
             self.commission_rate = tranche_data['commission_rate']
             self.gross_commission = tranche_data['gross_commission_value']  # Correct gross commission value
             self.withholding_tax = tranche_data['withholding_tax_value']   # Correct withholding tax value
@@ -3649,6 +3680,8 @@ def view_receivable_voucher(request, release_number):
         'lto_deduction_value': lto_deduction_value if tranche_record else 0,
         'lto_deduction_tax': lto_deduction_tax if tranche_record else 0,
         'lto_deduction_net': lto_deduction_net if tranche_record else 0,
+        'display_commission_rate': commission_rate,
+        'display_particulars': mock_details[0].particulars,
     }
     
     return render(request, 'commission.html', context)
@@ -4096,10 +4129,10 @@ def receivables(request):
     status_filter = request.GET.get('status', '')
     
     # Determine scope of data based on permissions
-    if request.user.is_superuser:
+    if request.user.is_superuser or request.user.is_staff:
         commission_entries = Commission.objects.all().order_by('-date_released')
         tranche_records = TrancheRecord.objects.all()
-        user_full_name = None  # not used for superuser
+        user_full_name = None  # not used for superuser/staff
     else:
         user_full_name = request.user.get_full_name()
         commission_entries = Commission.objects.filter(agent=request.user).order_by('-date_released')
@@ -4261,7 +4294,7 @@ def receivables(request):
                 tranche_records = tranche_records.none()
 
     # Apply team filter (works with user filter using AND logic)
-    if team_filter and request.user.is_superuser:
+    if team_filter and (request.user.is_superuser or request.user.is_staff):
         try:
             selected_team = Team.objects.get(id=team_filter)
             # Apply team filter to existing commission entries (AND logic)
@@ -4294,7 +4327,7 @@ def receivables(request):
     # Get all unique developers and properties for filter dropdowns
     from .models import Developer
     
-    if request.user.is_superuser:
+    if request.user.is_superuser or request.user.is_staff:
         # Get developers from Developer model
         all_developers = list(Developer.objects.values_list('name', flat=True).order_by('name'))
         all_properties = Commission.objects.values_list('project_name', flat=True).distinct().order_by('project_name')
@@ -4308,8 +4341,8 @@ def receivables(request):
     
     # Get all users for user filter dropdown
     all_users = []
-    if request.user.is_superuser:
-        # Superusers can see all users with commissions
+    if request.user.is_superuser or request.user.is_staff:
+        # Superusers and staff can see all users with commissions
         all_users = User.objects.filter(
             is_active=True,
             commission__isnull=False
@@ -4326,14 +4359,14 @@ def receivables(request):
             # If no team assigned, only show themselves
             all_users = User.objects.filter(id=request.user.id)
 
-    # Get all teams for team filter dropdown (only for superusers)
+    # Get all teams for team filter dropdown (for superusers and staff)
     all_teams = []
-    if request.user.is_superuser:
+    if request.user.is_superuser or request.user.is_staff:
         all_teams = Team.objects.filter(is_active=True).order_by('name')
-    
+
     # Get available years and months for date filters based on date_received from payments
     # This ensures the year filter shows years when payments were actually received
-    if request.user.is_superuser:
+    if request.user.is_superuser or request.user.is_staff:
         # Get dates from commission entries (which represent actual received payments)
         available_years = Commission.objects.dates('date_released', 'year', order='DESC')
         available_months = Commission.objects.dates('date_released', 'month', order='DESC')
@@ -4370,8 +4403,8 @@ def receivables(request):
 
     # Calculate ORIGINAL total commission using same filter logic as main data (AND logic)
     # Start with base queryset based on user permissions
-    if request.user.is_superuser:
-        # For superusers, start with all records
+    if request.user.is_superuser or request.user.is_staff:
+        # For superusers/staff, start with all records
         original_tranche_records = TrancheRecord.objects.all()
     else:
         # For regular users, start with their own records
@@ -4414,7 +4447,7 @@ def receivables(request):
             original_tranche_records = original_tranche_records.filter(q_objects)
 
     # Apply team filter to original records (AND logic)
-    if team_filter and request.user.is_superuser:
+    if team_filter and (request.user.is_superuser or request.user.is_staff):
         try:
             selected_team = Team.objects.get(id=team_filter)
             # For original tranche records, build a list of agent full names for team members
@@ -5305,26 +5338,9 @@ def tranche_history(request):
     tranche_records = TrancheRecord.objects.all()
     
     # Filter based on user role and permissions
-    if request.user.is_superuser:
-        # Superusers can see all records initially
+    if request.user.is_superuser or request.user.is_staff:
+        # Superusers and staff can see all records
         pass
-    elif request.user.is_staff:
-        # Staff can see:
-        # 1. Records they created
-        # 2. Records where they are the agent
-        # 3. Records for agents in their team
-        user_team = request.user.profile.team
-        team_members = User.objects.filter(
-            profile__team=user_team,
-            profile__is_approved=True
-        ).values_list('first_name', 'last_name')
-        team_full_names = [f"{first} {last}".strip() for first, last in team_members]
-        
-        tranche_records = tranche_records.filter(
-            Q(created_by=request.user) |  # Records they created
-            Q(agent_name=request.user.get_full_name()) |  # Records where they are the agent
-            Q(agent_name__in=team_full_names)  # Records for their team members
-        ).distinct()
     else:
         # Regular users can only see their own records
         tranche_records = tranche_records.filter(
@@ -5396,9 +5412,9 @@ def tranche_history(request):
         except ValueError:
             pass
     
-    # Apply user filter (only for superusers)
+    # Apply user filter (for superusers and staff)
     selected_user_name = None
-    if user_filter and request.user.is_superuser:
+    if user_filter and (request.user.is_superuser or request.user.is_staff):
         try:
             selected_user = User.objects.get(id=user_filter)
             selected_user_name = selected_user.get_full_name()  # Store for template context
@@ -5414,8 +5430,8 @@ def tranche_history(request):
         except User.DoesNotExist:
             pass
     
-    # Apply team filter (only for superusers)
-    if team_filter and request.user.is_superuser:
+    # Apply team filter (for superusers and staff)
+    if team_filter and (request.user.is_superuser or request.user.is_staff):
         try:
             # Get the team object by name (team_filter is team name from template)
             from .models import Team
@@ -5534,36 +5550,36 @@ def tranche_history(request):
     # Get all unique developers and properties for filter dropdowns
     from .models import Developer, Property
     
-    if request.user.is_superuser:
+    if request.user.is_superuser or request.user.is_staff:
         project_names = TrancheRecord.objects.values_list('project_name', flat=True).distinct().order_by('project_name')
         all_properties = [proj for proj in project_names if proj and proj.strip()]
-        
+
         # Get developers from Developer model
         all_developers = list(Developer.objects.values_list('name', flat=True).order_by('name'))
     else:
         user_records = TrancheRecord.objects.filter(agent_name=request.user.get_full_name())
         project_names = user_records.values_list('project_name', flat=True).distinct().order_by('project_name')
         all_properties = [proj for proj in project_names if proj and proj.strip()]
-        
+
         # Get developers from Developer model
         all_developers = list(Developer.objects.values_list('name', flat=True).order_by('name'))
     
-    # Get all users for user filter dropdown (only for superusers)
+    # Get all users for user filter dropdown (for superusers and staff)
     all_users = []
-    if request.user.is_superuser:
+    if request.user.is_superuser or request.user.is_staff:
         all_users = User.objects.filter(
             is_active=True,
             profile__is_approved=True
         ).distinct().order_by('first_name', 'last_name')
-    
-    # Get all teams for team filter dropdown (only for superusers)
+
+    # Get all teams for team filter dropdown (for superusers and staff)
     all_teams = []
-    if request.user.is_superuser:
+    if request.user.is_superuser or request.user.is_staff:
         from .models import Team
         all_teams = Team.objects.filter(is_active=True).order_by('name')
-    
+
     # Get available years and months for date filters (based on reservation_date)
-    if request.user.is_superuser:
+    if request.user.is_superuser or request.user.is_staff:
         available_years = TrancheRecord.objects.dates('reservation_date', 'year', order='DESC')
         available_months = TrancheRecord.objects.dates('reservation_date', 'month', order='DESC')
     else:
@@ -5577,7 +5593,7 @@ def tranche_history(request):
     
     # If a year is selected, get months for that year only
     if year_filter:
-        if request.user.is_superuser:
+        if request.user.is_superuser or request.user.is_staff:
             year_months = TrancheRecord.objects.filter(reservation_date__year=year_filter).dates('reservation_date', 'month', order='ASC')
         else:
             year_months = TrancheRecord.objects.filter(agent_name=request.user.get_full_name(), reservation_date__year=year_filter).dates('reservation_date', 'month', order='ASC')
@@ -5817,7 +5833,7 @@ def edit_tranche(request, tranche_id):
     record = get_object_or_404(TrancheRecord, id=tranche_id)
 
     # Check if user has permission to edit this tranche
-    if not (request.user.is_superuser or request.user.profile.role in ['Sales Manager', 'Sales Supervisor']):
+    if not (request.user.is_superuser or request.user.is_staff or request.user.profile.role in ['Sales Manager', 'Sales Supervisor']):
         messages.error(request, 'You do not have permission to edit tranches.')
         return redirect('tranche_history')
 
@@ -6191,7 +6207,8 @@ def create_commission_slip3(request):
                 withholding_tax_rate=agent_tax_rate,
                 supervisor_withholding_tax_rate=supervisor_tax_rate,
                 manager_tax_rate=manager_tax_rate,
-                source='manual_breakdown'  # Set the source
+                source='manual_breakdown',  # Set the source
+                is_approved=False
             )
                     
             # Get commission rates for agent, supervisor and manager
@@ -6224,6 +6241,15 @@ def create_commission_slip3(request):
             # Add incentive if applicable
             if particulars == 'INCENTIVES':
                 total_gross_commission += Decimal(request.POST.get('incentive_amount', 0))
+
+            # Allow staff/superuser to override the gross commission amount
+            if request.user.is_staff or request.user.is_superuser:
+                staff_override = request.POST.get('staff_gross_commission_override', '').strip()
+                if staff_override:
+                    try:
+                        total_gross_commission = Decimal(staff_override)
+                    except (ValueError, InvalidOperation):
+                        pass  # Fall back to the calculated value
 
             # STEP 4: VAT-Compliant Calculation
             vat_divisor = Decimal('1') + (vat_rate / Decimal('100'))

@@ -84,6 +84,7 @@ urlpatterns = [
     path('password_change/done/', auth_views.PasswordChangeDoneView.as_view(template_name='password_change_done.html'), name='password_change_done'),
     path('activate/<uidb64>/<token>/', views.activate_account, name='activate_account'),
     path('commission-history/', views.commission_history, name='commission_history'),
+    path('approve-commission-slip/<int:slip_id>/<str:slip_type>/', views.approve_commission_slip, name='approve_commission_slip'),
     path('add-property/', views.add_property, name='add_property'),
     path('edit-property/<int:property_id>/', views.edit_property, name='edit_property'),
     path('add-developer/', views.add_developer, name='add_developer'),

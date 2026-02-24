@@ -700,8 +700,8 @@
        
         
 
-        <!-- Team Filter (Only for superusers) -->
-        {% if user.is_superuser and all_teams %}
+        <!-- Team Filter (for superusers and staff) -->
+        {% if all_teams and user.is_superuser or all_teams and user.is_staff %}
         <div>
           <label for="teamFilter" class="block text-sm font-medium text-gray-700 mb-2">Team</label>
           <select id="teamFilter" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 shadow-sm">
@@ -725,6 +725,18 @@
           </select>
         </div>
 
+
+        {% if user.is_superuser or user.is_staff %}
+        <!-- Approval Status Filter -->
+        <div>
+          <label for="statusFilter2" class="block text-sm font-medium text-gray-700 mb-2">Status</label>
+          <select id="statusFilter2" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 shadow-sm">
+            <option value="">All Statuses</option>
+            <option value="approved" {% if selected_status == 'approved' %}selected{% endif %}>Approved</option>
+            <option value="pending" {% if selected_status == 'pending' %}selected{% endif %}>Pending</option>
+          </select>
+        </div>
+        {% endif %}
 
          <!-- Property Filter -->
          <div>
@@ -803,6 +815,7 @@
         <thead>
           <tr class="bg-gray-50 text-gray-500 text-sm">
             <th class="px-4 py-3 text-left font-medium">Actions</th>
+            <th class="px-4 py-3 text-left font-medium">Status</th>
             <th class="px-4 py-3 text-left font-medium">Date</th>
             <th class="px-4 py-3 text-left font-medium">Agent</th>
             <th class="px-4 py-3 text-left font-medium">Project</th>
@@ -865,7 +878,7 @@
                 {% if user.is_superuser or user.is_staff %}
                   <form method="POST" action="{% url 'delete_commission_slip' slip.id %}" class="inline-block">
                     {% csrf_token %}
-                    <button type="submit" 
+                    <button type="submit"
                             onclick="return confirm('Are you sure you want to delete this commission slip?')"
                             class="action-btn bg-red-500 text-white hover:bg-red-600"
                             title="Delete Commission">
@@ -873,9 +886,39 @@
                     </button>
                   </form>
                 {% endif %}
+
+                {% if user.is_superuser or user.is_staff %}
+                  {% if not slip.is_approved %}
+                    {% if user.is_superuser %}
+                      <form method="POST" action="{% url 'approve_commission_slip' slip.id slip.slip_type %}" class="inline-block">
+                        {% csrf_token %}
+                        <button type="submit"
+                                onclick="return confirm('Approve this commission slip?')"
+                                class="action-btn bg-green-500 text-white hover:bg-green-600"
+                                title="Approve Commission">
+                          <i class="fas fa-check"></i>
+                        </button>
+                      </form>
+                    {% else %}
+                      <button type="button" disabled
+                              class="action-btn bg-gray-300 text-gray-500 cursor-not-allowed"
+                              title="Only superusers can approve">
+                        <i class="fas fa-check"></i>
+                      </button>
+                    {% endif %}
+                  {% endif %}
+                {% endif %}
               </div>
             </td>
-            
+
+            <td class="px-4 py-3 whitespace-nowrap">
+              {% if slip.is_approved %}
+                <span class="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">Approved</span>
+              {% else %}
+                <span class="px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium">Pending</span>
+              {% endif %}
+            </td>
+
             <td class="px-4 py-3 whitespace-nowrap text-gray-600">
               {{ slip.date|date:"M d, Y" }}
             </td>
