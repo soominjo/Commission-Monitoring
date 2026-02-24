@@ -32,7 +32,7 @@ SECRET_KEY = 'django-insecure-gn#j1iw0i@xv812+lsb87qlgegbz1e)))fh!l5vqjqfo_drp4#
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['innersparcrealty.pythonanywhere.com', 'localhost', '127.0.0.1']
 
 # Application definition
 
