@@ -466,9 +466,6 @@
                        <polyline points="20 6 9 17 4 12"></polyline>
                      </svg>
                      <span class="nav-label transition-all duration-200 font-medium">Users</span>
-                     {% if unapproved_users_count %}
-                     <span class="badge">{{ unapproved_users_count }}</span>
-                     {% endif %}
                    </a>
                    {% endif %}
 
@@ -481,7 +478,6 @@
          <circle cx="12" cy="12" r="10"/>
        </svg>
        <span class="nav-label transition-all duration-200 font-medium">Commissions Dashboard</span>
-        {% if new_commissions_count %}<span class="badge">{{ new_commissions_count }}</span>{% endif %}
      </a>
 
      
@@ -493,7 +489,6 @@
           <line x1="2" y1="10" x2="22" y2="10"/>
         </svg>
         <span class="nav-label transition-all duration-200 font-medium">Account Summary</span>
-        {% if new_tranches_count %}<span class="badge">{{ new_tranches_count }}</span>{% endif %}
       </a>
 
       
@@ -507,7 +502,6 @@
           <path d="M7 11.5h10"/>
         </svg>
         <span class="nav-label transition-all duration-200 font-medium">Receivables</span>
-        {% if pending_receivables_count %}<span class="badge">{{ pending_receivables_count }}</span>{% endif %}
       </a>
  
 <br>
@@ -523,21 +517,6 @@
         <span class="nav-label transition-all duration-200 font-medium">Sign Out</span>
       </a>
     {% endif %}
-    <style>
-  .badge {
-    margin-left: 4px;
-    background-color: #dc2626;
-    color: white;
-    font-size: 10px;
-    font-weight: 600;
-    padding: 0.375rem 0.375rem;
-    border-radius: 9999px;
-    display: inline-block;
-    min-width: 1rem;
-    text-align: center;
-    line-height: 1;
-  }
-</style>
     </nav>
 
     <div class="profile-section p-4">

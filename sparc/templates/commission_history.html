@@ -1008,13 +1008,19 @@
         Showing {{ commission_slips.start_index }} - {{ commission_slips.end_index }} of {{ commission_slips.paginator.count }}
       </div>
       <div class="flex space-x-2">
+        {% if commission_slips.number > 1 %}
+        <a href="?page=1{% if selected_team %}&team={{ selected_team }}{% endif %}{% if selected_user %}&user={{ selected_user }}{% endif %}{% if selected_year %}&year={{ selected_year }}{% endif %}{% if selected_month %}&month={{ selected_month }}{% endif %}{% if selected_developer %}&developer={{ selected_developer }}{% endif %}{% if selected_property %}&property={{ selected_property }}{% endif %}{% if selected_type %}&type={{ selected_type }}{% endif %}{% if selected_status %}&status={{ selected_status }}{% endif %}{% if search_query %}&search={{ search_query }}{% endif %}{% if selected_date_from %}&date_from={{ selected_date_from }}{% endif %}{% if selected_date_to %}&date_to={{ selected_date_to }}{% endif %}"
+           class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200">
+          « First
+        </a>
+        {% endif %}
         {% if commission_slips.has_previous %}
-        <a href="?page={{ commission_slips.previous_page_number }}{% if selected_team %}&team={{ selected_team }}{% endif %}{% if selected_user %}&user={{ selected_user }}{% endif %}{% if selected_year %}&year={{ selected_year }}{% endif %}{% if selected_month %}&month={{ selected_month }}{% endif %}{% if selected_developer %}&developer={{ selected_developer }}{% endif %}{% if selected_property %}&property={{ selected_property }}{% endif %}{% if selected_type %}&type={{ selected_type }}{% endif %}{% if selected_status %}&status={{ selected_status }}{% endif %}{% if search_query %}&search={{ search_query }}{% endif %}{% if selected_date_from %}&date_from={{ selected_date_from }}{% endif %}{% if selected_date_to %}&date_to={{ selected_date_to }}{% endif %}" 
+        <a href="?page={{ commission_slips.previous_page_number }}{% if selected_team %}&team={{ selected_team }}{% endif %}{% if selected_user %}&user={{ selected_user }}{% endif %}{% if selected_year %}&year={{ selected_year }}{% endif %}{% if selected_month %}&month={{ selected_month }}{% endif %}{% if selected_developer %}&developer={{ selected_developer }}{% endif %}{% if selected_property %}&property={{ selected_property }}{% endif %}{% if selected_type %}&type={{ selected_type }}{% endif %}{% if selected_status %}&status={{ selected_status }}{% endif %}{% if search_query %}&search={{ search_query }}{% endif %}{% if selected_date_from %}&date_from={{ selected_date_from }}{% endif %}{% if selected_date_to %}&date_to={{ selected_date_to }}{% endif %}"
            class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200">
           <i class="fas fa-chevron-left"></i>
         </a>
         {% endif %}
-        
+
         {% for num in commission_slips.paginator.page_range %}
           {% if commission_slips.number == num %}
             <span class="px-4 py-2 bg-blue-500 text-white rounded-lg">{{ num }}</span>
@@ -1022,11 +1028,17 @@
             <a href="?page={{ num }}{% if selected_team %}&team={{ selected_team }}{% endif %}{% if selected_user %}&user={{ selected_user }}{% endif %}{% if selected_year %}&year={{ selected_year }}{% endif %}{% if selected_month %}&month={{ selected_month }}{% endif %}{% if selected_developer %}&developer={{ selected_developer }}{% endif %}{% if selected_property %}&property={{ selected_property }}{% endif %}{% if selected_type %}&type={{ selected_type }}{% endif %}{% if selected_status %}&status={{ selected_status }}{% endif %}{% if search_query %}&search={{ search_query }}{% endif %}{% if selected_date_from %}&date_from={{ selected_date_from }}{% endif %}{% if selected_date_to %}&date_to={{ selected_date_to }}{% endif %}" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200">{{ num }}</a>
           {% endif %}
         {% endfor %}
-        
+
         {% if commission_slips.has_next %}
-        <a href="?page={{ commission_slips.next_page_number }}{% if selected_team %}&team={{ selected_team }}{% endif %}{% if selected_user %}&user={{ selected_user }}{% endif %}{% if selected_year %}&year={{ selected_year }}{% endif %}{% if selected_month %}&month={{ selected_month }}{% endif %}{% if selected_developer %}&developer={{ selected_developer }}{% endif %}{% if selected_property %}&property={{ selected_property }}{% endif %}{% if selected_type %}&type={{ selected_type }}{% endif %}{% if selected_status %}&status={{ selected_status }}{% endif %}{% if search_query %}&search={{ search_query }}{% endif %}{% if selected_date_from %}&date_from={{ selected_date_from }}{% endif %}{% if selected_date_to %}&date_to={{ selected_date_to }}{% endif %}" 
+        <a href="?page={{ commission_slips.next_page_number }}{% if selected_team %}&team={{ selected_team }}{% endif %}{% if selected_user %}&user={{ selected_user }}{% endif %}{% if selected_year %}&year={{ selected_year }}{% endif %}{% if selected_month %}&month={{ selected_month }}{% endif %}{% if selected_developer %}&developer={{ selected_developer }}{% endif %}{% if selected_property %}&property={{ selected_property }}{% endif %}{% if selected_type %}&type={{ selected_type }}{% endif %}{% if selected_status %}&status={{ selected_status }}{% endif %}{% if search_query %}&search={{ search_query }}{% endif %}{% if selected_date_from %}&date_from={{ selected_date_from }}{% endif %}{% if selected_date_to %}&date_to={{ selected_date_to }}{% endif %}"
            class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200">
           <i class="fas fa-chevron-right"></i>
+        </a>
+        {% endif %}
+        {% if commission_slips.number < commission_slips.paginator.num_pages %}
+        <a href="?page={{ commission_slips.paginator.num_pages }}{% if selected_team %}&team={{ selected_team }}{% endif %}{% if selected_user %}&user={{ selected_user }}{% endif %}{% if selected_year %}&year={{ selected_year }}{% endif %}{% if selected_month %}&month={{ selected_month }}{% endif %}{% if selected_developer %}&developer={{ selected_developer }}{% endif %}{% if selected_property %}&property={{ selected_property }}{% endif %}{% if selected_type %}&type={{ selected_type }}{% endif %}{% if selected_status %}&status={{ selected_status }}{% endif %}{% if search_query %}&search={{ search_query }}{% endif %}{% if selected_date_from %}&date_from={{ selected_date_from }}{% endif %}{% if selected_date_to %}&date_to={{ selected_date_to }}{% endif %}"
+           class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200">
+          Last »
         </a>
         {% endif %}
       </div>

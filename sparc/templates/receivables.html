@@ -425,21 +425,33 @@
                 Showing {{ page_obj.start_index }} to {{ page_obj.end_index }} of {{ page_obj.paginator.count }} results
             </div>
             <div class="flex space-x-2">
+                {% if page_obj.number > 1 %}
+                    <a href="?page=1{% if selected_team %}&team={{ selected_team }}{% endif %}{% if selected_user %}&user={{ selected_user }}{% endif %}{% if selected_year %}&year={{ selected_year }}{% endif %}{% if selected_month %}&month={{ selected_month }}{% endif %}{% if selected_developer %}&developer={{ selected_developer }}{% endif %}{% if selected_property %}&property={{ selected_property }}{% endif %}{% if selected_commission_type %}&commission_type={{ selected_commission_type }}{% endif %}{% if selected_type %}&type={{ selected_type }}{% endif %}{% if selected_status %}&status={{ selected_status }}{% endif %}{% if selected_date_from %}&date_from={{ selected_date_from }}{% endif %}{% if selected_date_to %}&date_to={{ selected_date_to }}{% endif %}"
+                       class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+                        « First
+                    </a>
+                {% endif %}
                 {% if page_obj.has_previous %}
-                    <a href="?page={{ page_obj.previous_page_number }}{% if selected_team %}&team={{ selected_team }}{% endif %}{% if selected_user %}&user={{ selected_user }}{% endif %}{% if selected_year %}&year={{ selected_year }}{% endif %}{% if selected_month %}&month={{ selected_month }}{% endif %}{% if selected_developer %}&developer={{ selected_developer }}{% endif %}{% if selected_property %}&property={{ selected_property }}{% endif %}{% if selected_commission_type %}&commission_type={{ selected_commission_type }}{% endif %}{% if selected_type %}&type={{ selected_type }}{% endif %}{% if selected_status %}&status={{ selected_status }}{% endif %}{% if selected_date_from %}&date_from={{ selected_date_from }}{% endif %}{% if selected_date_to %}&date_to={{ selected_date_to }}{% endif %}" 
+                    <a href="?page={{ page_obj.previous_page_number }}{% if selected_team %}&team={{ selected_team }}{% endif %}{% if selected_user %}&user={{ selected_user }}{% endif %}{% if selected_year %}&year={{ selected_year }}{% endif %}{% if selected_month %}&month={{ selected_month }}{% endif %}{% if selected_developer %}&developer={{ selected_developer }}{% endif %}{% if selected_property %}&property={{ selected_property }}{% endif %}{% if selected_commission_type %}&commission_type={{ selected_commission_type }}{% endif %}{% if selected_type %}&type={{ selected_type }}{% endif %}{% if selected_status %}&status={{ selected_status }}{% endif %}{% if selected_date_from %}&date_from={{ selected_date_from }}{% endif %}{% if selected_date_to %}&date_to={{ selected_date_to }}{% endif %}"
                        class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
                         Previous
                     </a>
                 {% endif %}
-                
+
                 <span class="px-4 py-2 text-sm font-medium text-gray-700 bg-blue-50 border border-blue-200 rounded-lg">
                     Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
                 </span>
-                
+
                 {% if page_obj.has_next %}
-                    <a href="?page={{ page_obj.next_page_number }}{% if selected_team %}&team={{ selected_team }}{% endif %}{% if selected_user %}&user={{ selected_user }}{% endif %}{% if selected_year %}&year={{ selected_year }}{% endif %}{% if selected_month %}&month={{ selected_month }}{% endif %}{% if selected_developer %}&developer={{ selected_developer }}{% endif %}{% if selected_property %}&property={{ selected_property }}{% endif %}{% if selected_commission_type %}&commission_type={{ selected_commission_type }}{% endif %}{% if selected_type %}&type={{ selected_type }}{% endif %}{% if selected_status %}&status={{ selected_status }}{% endif %}{% if selected_date_from %}&date_from={{ selected_date_from }}{% endif %}{% if selected_date_to %}&date_to={{ selected_date_to }}{% endif %}" 
+                    <a href="?page={{ page_obj.next_page_number }}{% if selected_team %}&team={{ selected_team }}{% endif %}{% if selected_user %}&user={{ selected_user }}{% endif %}{% if selected_year %}&year={{ selected_year }}{% endif %}{% if selected_month %}&month={{ selected_month }}{% endif %}{% if selected_developer %}&developer={{ selected_developer }}{% endif %}{% if selected_property %}&property={{ selected_property }}{% endif %}{% if selected_commission_type %}&commission_type={{ selected_commission_type }}{% endif %}{% if selected_type %}&type={{ selected_type }}{% endif %}{% if selected_status %}&status={{ selected_status }}{% endif %}{% if selected_date_from %}&date_from={{ selected_date_from }}{% endif %}{% if selected_date_to %}&date_to={{ selected_date_to }}{% endif %}"
                        class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
                         Next
+                    </a>
+                {% endif %}
+                {% if page_obj.number < page_obj.paginator.num_pages %}
+                    <a href="?page={{ page_obj.paginator.num_pages }}{% if selected_team %}&team={{ selected_team }}{% endif %}{% if selected_user %}&user={{ selected_user }}{% endif %}{% if selected_year %}&year={{ selected_year }}{% endif %}{% if selected_month %}&month={{ selected_month }}{% endif %}{% if selected_developer %}&developer={{ selected_developer }}{% endif %}{% if selected_property %}&property={{ selected_property }}{% endif %}{% if selected_commission_type %}&commission_type={{ selected_commission_type }}{% endif %}{% if selected_type %}&type={{ selected_type }}{% endif %}{% if selected_status %}&status={{ selected_status }}{% endif %}{% if selected_date_from %}&date_from={{ selected_date_from }}{% endif %}{% if selected_date_to %}&date_to={{ selected_date_to }}{% endif %}"
+                       class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+                        Last »
                     </a>
                 {% endif %}
             </div>

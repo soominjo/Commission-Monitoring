@@ -95,6 +95,7 @@ urlpatterns = [
     path('add-team/', views.add_team, name='add_team'),
     path('delete-team/<int:team_id>/', views.delete_team, name='delete_team'),
     path('fix-commission-assignments/', views.fix_commission_assignments, name='fix_commission_assignments'),
+    path('notifications/mark-read/', views.mark_notifications_read, name='mark_notifications_read'),
     # Superuser edit other user profile
 
     path('team/<int:pk>/edit/', staff_views.edit_team, name='edit_team'),

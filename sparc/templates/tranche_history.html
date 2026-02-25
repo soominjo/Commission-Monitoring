@@ -566,21 +566,33 @@
       {% if page_obj.paginator.num_pages > 1 %}
       <div class="mt-8 flex justify-center">
         <div class="flex items-center space-x-2">
+          {% if page_obj.number > 1 %}
+          <a href="?page=1{% if selected_developer %}&developer={{ selected_developer }}{% endif %}{% if selected_property %}&property={{ selected_property }}{% endif %}{% if selected_month %}&month={{ selected_month }}{% endif %}{% if selected_year %}&year={{ selected_year }}{% endif %}{% if selected_user %}&user={{ selected_user }}{% endif %}{% if selected_team %}&team={{ selected_team }}{% endif %}{% if selected_date_from %}&date_from={{ selected_date_from }}{% endif %}{% if selected_date_to %}&date_to={{ selected_date_to }}{% endif %}"
+             class="px-4 py-2 bg-white border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-100 transition">
+            « First
+          </a>
+          {% endif %}
           {% if page_obj.has_previous %}
-          <a href="?page={{ page_obj.previous_page_number }}{% if selected_developer %}&developer={{ selected_developer }}{% endif %}{% if selected_property %}&property={{ selected_property }}{% endif %}{% if selected_month %}&month={{ selected_month }}{% endif %}{% if selected_year %}&year={{ selected_year }}{% endif %}{% if selected_user %}&user={{ selected_user }}{% endif %}{% if selected_team %}&team={{ selected_team }}{% endif %}{% if selected_date_from %}&date_from={{ selected_date_from }}{% endif %}{% if selected_date_to %}&date_to={{ selected_date_to }}{% endif %}" 
+          <a href="?page={{ page_obj.previous_page_number }}{% if selected_developer %}&developer={{ selected_developer }}{% endif %}{% if selected_property %}&property={{ selected_property }}{% endif %}{% if selected_month %}&month={{ selected_month }}{% endif %}{% if selected_year %}&year={{ selected_year }}{% endif %}{% if selected_user %}&user={{ selected_user }}{% endif %}{% if selected_team %}&team={{ selected_team }}{% endif %}{% if selected_date_from %}&date_from={{ selected_date_from }}{% endif %}{% if selected_date_to %}&date_to={{ selected_date_to }}{% endif %}"
              class="px-4 py-2 bg-white border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-100 transition">
             <i class="fas fa-chevron-left mr-1"></i> Previous
           </a>
           {% endif %}
-          
+
           <span class="px-4 py-2 bg-blue-100 text-blue-800 font-medium rounded-lg">
             Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
           </span>
-          
+
           {% if page_obj.has_next %}
           <a href="?page={{ page_obj.next_page_number }}{% if selected_developer %}&developer={{ selected_developer }}{% endif %}{% if selected_property %}&property={{ selected_property }}{% endif %}{% if selected_month %}&month={{ selected_month }}{% endif %}{% if selected_year %}&year={{ selected_year }}{% endif %}{% if selected_user %}&user={{ selected_user }}{% endif %}{% if selected_team %}&team={{ selected_team }}{% endif %}{% if selected_date_from %}&date_from={{ selected_date_from }}{% endif %}{% if selected_date_to %}&date_to={{ selected_date_to }}{% endif %}"
              class="px-4 py-2 bg-white border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-100 transition">
             Next <i class="fas fa-chevron-right ml-1"></i>
+          </a>
+          {% endif %}
+          {% if page_obj.number < page_obj.paginator.num_pages %}
+          <a href="?page={{ page_obj.paginator.num_pages }}{% if selected_developer %}&developer={{ selected_developer }}{% endif %}{% if selected_property %}&property={{ selected_property }}{% endif %}{% if selected_month %}&month={{ selected_month }}{% endif %}{% if selected_year %}&year={{ selected_year }}{% endif %}{% if selected_user %}&user={{ selected_user }}{% endif %}{% if selected_team %}&team={{ selected_team }}{% endif %}{% if selected_date_from %}&date_from={{ selected_date_from }}{% endif %}{% if selected_date_to %}&date_to={{ selected_date_to }}{% endif %}"
+             class="px-4 py-2 bg-white border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-100 transition">
+            Last »
           </a>
           {% endif %}
         </div>

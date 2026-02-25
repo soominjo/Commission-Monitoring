@@ -87,11 +87,55 @@ def find_agent_user_by_name(agent_name):
     users_with_similar_names = User.objects.annotate(
         full_name=Concat('first_name', models.Value(' '), 'last_name')
     ).filter(full_name__icontains=agent_name)
-    
+
     if users_with_similar_names.exists():
         return users_with_similar_names.first()
-    
+
     return None
+
+
+def check_past_due_tranches():
+    """Create warning notifications for admins when tranche payments are past due.
+
+    Runs idempotently: each overdue payment is flagged with past_due_notified=True
+    after the first notification so it never fires again.
+    """
+    import datetime as _dt
+    today = _dt.date.today()
+
+    overdue = TranchePayment.objects.filter(
+        expected_date__lt=today,
+        received_amount=0,
+        status='Pending',
+        past_due_notified=False,
+    ).select_related('tranche_record')
+
+    if not overdue.exists():
+        return
+
+    admin_users = list(User.objects.filter(Q(is_superuser=True) | Q(is_staff=True)))
+    if not admin_users:
+        return
+
+    notifications = []
+    for payment in overdue:
+        label = "LTO" if payment.is_lto else f"Tranche #{payment.tranche_number}"
+        msg = (
+            f"\u26a0\ufe0f PAST DUE: {label} for {payment.tranche_record.project_name} "
+            f"was due on {payment.expected_date.strftime('%b %d, %Y')}."
+        )
+        link = reverse('view_tranche', args=[payment.tranche_record.id])
+        for admin in admin_users:
+            notifications.append(Notification(
+                user=admin,
+                message=msg,
+                link=link,
+                notification_type='warning',
+            ))
+        payment.past_due_notified = True
+        payment.save(update_fields=['past_due_notified'])
+
+    Notification.objects.bulk_create(notifications)
 
 
 def fix_orphaned_commissions():
@@ -598,6 +642,8 @@ def export_top5_excel(request):
 
 
 def profile(request):
+    if request.user.is_superuser or request.user.is_staff:
+        check_past_due_tranches()
     # Get commission records (using Commission model instead of Sale)
     if request.user.is_superuser or request.user.is_staff:
         commissions_list = Commission.objects.all().order_by('-date_released')
@@ -949,7 +995,14 @@ def approve_user(request, profile_id):
     if request.method == "POST":
         profile_to_approve.is_approved = True
         profile_to_approve.save()
-        
+
+        Notification.objects.create(
+            user=profile_to_approve.user,
+            message="Your account has been approved! You can now access your dashboard.",
+            link=reverse('profile'),
+            notification_type='system',
+        )
+
         # Send approval email with updated message
         send_approval_email(request, profile_to_approve.user)
         messages.success(request, f'User {profile_to_approve.user.username} has been approved successfully.')
@@ -1109,6 +1162,16 @@ def create_commission_slip(request):
                         withholding_tax_rate=position['tax_rate'],
                         percentage_of_particulars=percentage_of_particulars
                     )
+
+            _admin_qs = list(User.objects.filter(Q(is_superuser=True) | Q(is_staff=True)))
+            Notification.objects.bulk_create([
+                Notification(
+                    user=r,
+                    message=f"New Pending Agent Commission Slip generated for {slip.sales_agent_name}",
+                    link=reverse('commission', args=[slip.id]),
+                    notification_type='commission',
+                ) for r in _admin_qs
+            ])
 
             messages.success(request, "Commission slip created successfully!")
             return redirect('commission_history')
@@ -1545,7 +1608,7 @@ def commission_history(request):
         all_slips.append(slip)
 
     # Sort all slips by date (descending)
-    all_slips.sort(key=lambda slip: slip.date if slip.date else slip.created_at, reverse=True)
+    all_slips.sort(key=lambda slip: (not slip.is_approved, slip.date if slip.date else slip.created_at), reverse=True)
 
     # Paginate merged slips
     page = request.GET.get('page', 1)
@@ -2673,6 +2736,16 @@ def create_commission_slip2(request):
                         percentage_of_particulars=percentage_of_particulars
                     )
 
+            _admin_qs = list(User.objects.filter(Q(is_superuser=True) | Q(is_staff=True)))
+            Notification.objects.bulk_create([
+                Notification(
+                    user=r,
+                    message=f"New Pending Management Commission Slip generated for {slip.sales_agent_name}",
+                    link=reverse('commission2', args=[slip.id]),
+                    notification_type='commission',
+                ) for r in _admin_qs
+            ])
+
             messages.success(request, "Commission slip created successfully!")
             return redirect('commission_history')
     else:
@@ -2853,6 +2926,37 @@ def approve_commission_slip(request, slip_id, slip_type):
 
     slip.is_approved = True
     slip.save()
+
+    # Notify target users now that the slip is approved
+    _target_users = []
+    if slip_type == 'supervisor_agent':
+        _notification_link = reverse('commission3', args=[slip.id])
+        for _name in [slip.sales_agent_name, slip.supervisor_name, slip.manager_name]:
+            _u = find_agent_user_by_name(_name) if _name else None
+            if _u:
+                _target_users.append(_u)
+    elif slip.source == 'full_breakdown':
+        _notification_link = reverse('commission2', args=[slip.id])
+        _u = find_agent_user_by_name(slip.sales_agent_name)
+        if _u:
+            _target_users.append(_u)
+    else:
+        _notification_link = reverse('commission', args=[slip.id])
+        for _name in [slip.sales_agent_name, slip.sales_manager_name]:
+            _u = find_agent_user_by_name(_name) if _name else None
+            if _u:
+                _target_users.append(_u)
+
+    if _target_users:
+        Notification.objects.bulk_create([
+            Notification(
+                user=_u,
+                message=f"✅ Approved: Your commission slip for {slip.project_name} has been approved!",
+                link=_notification_link,
+                notification_type='commission',
+            ) for _u in _target_users
+        ])
+
     messages.success(request, f'Commission slip for {slip.sales_agent_name} has been approved.')
     return redirect('commission_history')
 
@@ -3640,13 +3744,7 @@ def view_receivable_voucher(request, release_number):
     class MockCommissionDetail:
         def __init__(self, commission_entry, tranche_data):
             self.position = 'Sales Agent'
-            rn = commission_entry.release_number or ''
-            if 'COMBINED' in rn:
-                self.particulars = 'COMBINED TRANCHES'
-            elif 'LTO' in rn:
-                self.particulars = 'LOAN TAKE OUT'
-            else:
-                self.particulars = 'DOWN PAYMENT'
+            self.particulars = 'COMMISSION'
             self.commission_rate = tranche_data['commission_rate']
             self.gross_commission = tranche_data['gross_commission_value']  # Correct gross commission value
             self.withholding_tax = tranche_data['withholding_tax_value']   # Correct withholding tax value
@@ -3680,8 +3778,6 @@ def view_receivable_voucher(request, release_number):
         'lto_deduction_value': lto_deduction_value if tranche_record else 0,
         'lto_deduction_tax': lto_deduction_tax if tranche_record else 0,
         'lto_deduction_net': lto_deduction_net if tranche_record else 0,
-        'display_commission_rate': commission_rate,
-        'display_particulars': mock_details[0].particulars,
     }
     
     return render(request, 'commission.html', context)
@@ -3973,7 +4069,14 @@ def create_combined_voucher(request):
             commission_amount=combined_net_commission
         )
         logger.info(f'Created combined voucher for {agent_user.get_full_name()}: {release_number} - ₱{combined_net_commission}')
-    
+
+    Notification.objects.create(
+        user=agent_user,
+        message=f"New Combined Voucher generated for {tranche_record.project_name}",
+        link=reverse('view_receivable_voucher', args=[release_number]),
+        notification_type='receivable',
+    )
+
     # Link each selected tranche to this combined voucher AND update payment data
     for tranche in tranches:
         tranche.combined_voucher_number = release_number
@@ -3993,11 +4096,24 @@ def create_combined_voucher(request):
             tranche_tax_amount = option1_monthly * option1_tax_rate
             individual_expected_commission = tranche_net_amount - tranche_tax_amount
         
+        # Delete the individual Commission entry (if any) so it no longer
+        # appears as a separate row on the Receivables page.
+        individual_release_code = (
+            f"LTO-{tranche_record.id}-1"
+            if tranche.is_lto
+            else f"DP-{tranche_record.id}-{tranche.tranche_number}"
+        )
+        Commission.objects.filter(
+            release_number=individual_release_code,
+            agent=agent_user
+        ).delete()
+        logger.info(f'Deleted individual commission record {individual_release_code} (superseded by combined voucher {release_number})')
+
         # Update the tranche payment data to reflect the combined voucher
         tranche.received_amount = individual_expected_commission
         tranche.date_received = commission_date
         tranche.status = 'Received'  # Mark as received since we're creating a voucher
-        
+
         tranche.save()
         logger.info(f'Updated tranche #{tranche.tranche_number}: linked to combined voucher {release_number}, received_amount=₱{individual_expected_commission}, status=Received')
     
@@ -5178,7 +5294,7 @@ class CustomPasswordResetCompleteView(PasswordResetCompleteView):
 @require_http_methods(["POST"])
 def update_tranche(request):
     try:
-        data = json.loads(request.body)
+        data = json .loads(request.body)
         tranche_number = data.get('tranche_number')
         received_amount = data.get('received_amount')
         date_received = data.get('date_received')
@@ -5320,8 +5436,11 @@ def delete_profile(request, profile_id):
 
 @login_required(login_url='signin')
 def tranche_history(request):
+    if request.user.is_superuser or request.user.is_staff:
+        check_past_due_tranches()
+
     from datetime import datetime
-    
+
     # Get filter parameters
     developer_filter = request.GET.get('developer', '')
     property_filter = request.GET.get('property', '')
@@ -5823,6 +5942,7 @@ def view_tranche(request, tranche_id):
         'lto_deduction_value': lto_deduction_value,
         'lto_deduction_tax': lto_deduction_tax,
         'lto_deduction_net': lto_deduction_net,
+        'today': datetime.today().date(),
     }
 
     return render(request, 'view_tranche.html', context)
@@ -5936,6 +6056,15 @@ def edit_tranche(request, tranche_id):
                                         commission_amount=payment.received_amount
                                     )
                                     logger.info(f'Created new commission for {agent_user.get_full_name()}: {release_code} - ₱{payment.received_amount}')
+
+                                if payment.status == 'Received':
+                                    _tranche_label = "LTO" if payment.is_lto else f"Tranche #{payment.tranche_number}"
+                                    Notification.objects.create(
+                                        user=agent_user,
+                                        message=f"Payment Received: {_tranche_label} for {record.project_name}",
+                                        link=reverse('view_tranche', args=[tranche_id]),
+                                        notification_type='tranche',
+                                    )
                             else:
                                 # Log detailed information about the failed lookup
                                 available_users = [f"{u.get_full_name()} ({u.username})" for u in User.objects.filter(is_active=True)]
@@ -6311,6 +6440,16 @@ def create_commission_slip3(request):
                         is_supervisor=position['is_supervisor'],
                         percentage_of_particulars=percentage_of_particulars
                     )
+
+            _admin_qs = list(User.objects.filter(Q(is_superuser=True) | Q(is_staff=True)))
+            Notification.objects.bulk_create([
+                Notification(
+                    user=r,
+                    message=f"New Pending Agent-Supervisor Commission Slip generated for {slip.sales_agent_name}",
+                    link=reverse('commission3', args=[slip.id]),
+                    notification_type='commission',
+                ) for r in _admin_qs
+            ])
 
             messages.success(request, "Commission slip created successfully!")
             return redirect('commission_history')
@@ -6907,6 +7046,15 @@ def update_individual_tranche(request):
                             agent=agent_user,
                             commission_amount=tranche_payment.received_amount
                         )
+
+                    if tranche_payment.status == 'Received':
+                        _tranche_label = "LTO" if tranche_payment.is_lto else f"Tranche #{tranche_payment.tranche_number}"
+                        Notification.objects.create(
+                            user=agent_user,
+                            message=f"Payment Received: {_tranche_label} for {tranche_record.project_name}",
+                            link=reverse('edit_tranche', args=[tranche_record.id]),
+                            notification_type='tranche',
+                        )
                 else:
                     messages.warning(request, f'Could not find user account for agent: "{tranche_record.agent_name}".')
             
@@ -6926,4 +7074,12 @@ def update_individual_tranche(request):
             return redirect('edit_tranche', tranche_id=tranche_record_id)
         else:
             return redirect('tranche_history')
+
+
+@login_required
+def mark_notifications_read(request):
+    if request.method == 'POST':
+        Notification.objects.filter(user=request.user, is_read=False).update(is_read=True)
+        return JsonResponse({'status': 'success'})
+    return JsonResponse({'status': 'error'}, status=405)
 

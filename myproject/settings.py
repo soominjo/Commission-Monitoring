@@ -60,7 +60,6 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     "django_browser_reload.middleware.BrowserReloadMiddleware",
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'sparc.notification_middleware.NotificationSeenMiddleware',
 ]
 
 ROOT_URLCONF = 'myproject.urls'
