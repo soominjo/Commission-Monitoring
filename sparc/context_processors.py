@@ -9,6 +9,6 @@ def notification_counts(request):
     unread_qs = Notification.objects.filter(user=request.user, is_read=False).order_by('-created_at')
 
     return {
-        'notifications': unread_qs[:10],
+        'notifications': unread_qs[:7],
         'unread_count': unread_qs.count(),
     }

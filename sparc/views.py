@@ -5892,6 +5892,49 @@ def view_tranche(request, tranche_id):
     percentage_received2 = (total_commission_received2 / total_commission2 * 100) if total_commission2 > 0 else 0
     percentage_remaining2 = 100 - percentage_received2
 
+    # Build consolidated past-due warning message
+    _today = datetime.today().date()
+    _past_due_dp = [
+        item for item in dp_tranches
+        if item['tranche'].status == 'Pending' and item['tranche'].expected_date < _today
+    ]
+    _past_due_lto = [
+        item for item in lto_tranches
+        if item['tranche'].status == 'Pending' and item['tranche'].expected_date < _today
+    ]
+
+    past_due_warning_msg = ''
+    if _past_due_dp or _past_due_lto:
+        if _past_due_dp:
+            if len(_past_due_dp) == 1:
+                _t = _past_due_dp[0]['tranche']
+                _tranche_label = f"Tranche #{_t.tranche_number}"
+                _date_label = f"was due {_t.expected_date.strftime('%b %d, %Y')}"
+                _invoice_label = "the invoice"
+                _is_plural = bool(_past_due_lto)
+            else:
+                _nums = sorted(item['tranche'].tranche_number for item in _past_due_dp)
+                _dates = sorted(item['tranche'].expected_date for item in _past_due_dp)
+                _tranche_label = f"Tranches #{_nums[0]}-#{_nums[-1]}"
+                _date_label = f"was due {_dates[0].strftime('%b %d, %Y')} to {_dates[-1].strftime('%b %d, %Y')}"
+                _invoice_label = "the invoices"
+                _is_plural = True
+            if _past_due_lto:
+                _tranche_label += " and LTO"
+                _is_plural = True
+            _verb = "are" if _is_plural else "is"
+            past_due_warning_msg = (
+                f"Action Required: {_tranche_label} for {record.project_name} "
+                f"{_verb} past due ({_date_label}). Please generate {_invoice_label} and follow up."
+            )
+        else:
+            _lto_t = _past_due_lto[0]['tranche']
+            past_due_warning_msg = (
+                f"Action Required: LTO for {record.project_name} "
+                f"is past due (was due {_lto_t.expected_date.strftime('%b %d, %Y')}). "
+                f"Please generate the invoice and follow up."
+            )
+
     context = {
         'record': record,
         'total_contract_price': record.total_contract_price,
@@ -5943,6 +5986,7 @@ def view_tranche(request, tranche_id):
         'lto_deduction_tax': lto_deduction_tax,
         'lto_deduction_net': lto_deduction_net,
         'today': datetime.today().date(),
+        'past_due_warning_msg': past_due_warning_msg,
     }
 
     return render(request, 'view_tranche.html', context)
@@ -7082,4 +7126,13 @@ def mark_notifications_read(request):
         Notification.objects.filter(user=request.user, is_read=False).update(is_read=True)
         return JsonResponse({'status': 'success'})
     return JsonResponse({'status': 'error'}, status=405)
+
+
+@login_required(login_url='signin')
+def notifications_view(request):
+    all_notifications = Notification.objects.filter(user=request.user).order_by('-created_at')
+    paginator = Paginator(all_notifications, 20)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    return render(request, 'notifications.html', {'page_obj': page_obj})
 

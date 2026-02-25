@@ -1,0 +1,106 @@
+{% extends "index.html" %}
+
+{% block content %}
+<div class="container mx-auto px-6 py-8">
+
+  <!-- Header -->
+  <div class="flex items-center justify-between mb-6">
+    <h1 class="text-2xl font-bold text-gray-800">All Notifications</h1>
+    <span class="text-sm text-gray-500">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+  </div>
+
+  <!-- Notification List -->
+  <div class="bg-white rounded-2xl shadow border border-gray-100 overflow-hidden">
+    {% for notif in page_obj %}
+    <div class="flex items-start gap-4 px-5 py-4 border-l-4 border-b border-gray-100 last:border-b-0 transition-colors
+      {% if notif.notification_type == 'warning' or notif.notification_type == 'urgent' %}bg-yellow-50 hover:bg-yellow-100 border-l-yellow-400
+      {% elif notif.notification_type == 'commission' %}bg-green-50 hover:bg-green-100 border-l-green-400
+      {% else %}bg-blue-50 hover:bg-blue-100 border-l-blue-400{% endif %}
+      {% if notif.is_read %}opacity-60{% else %}font-semibold{% endif %}">
+
+      <!-- Icon -->
+      <div class="mt-0.5 flex-shrink-0">
+        {% if notif.notification_type == 'warning' or notif.notification_type == 'urgent' %}
+          <i class="fas fa-exclamation-triangle text-yellow-500 text-lg"></i>
+        {% elif notif.notification_type == 'commission' %}
+          <i class="fas fa-file-invoice-dollar text-green-500 text-lg"></i>
+        {% else %}
+          <i class="fas fa-info-circle text-blue-500 text-lg"></i>
+        {% endif %}
+      </div>
+
+      <!-- Message + meta -->
+      <div class="flex-1 min-w-0">
+        <p class="text-sm
+          {% if notif.notification_type == 'warning' or notif.notification_type == 'urgent' %}text-yellow-800
+          {% elif notif.notification_type == 'commission' %}text-green-800
+          {% else %}text-blue-800{% endif %}">
+          {{ notif.message }}
+        </p>
+        <p class="text-xs text-gray-400 mt-1">{{ notif.created_at|date:"M d, Y – H:i" }}</p>
+      </div>
+
+      <!-- Unread badge -->
+      <div class="flex-shrink-0 self-center">
+        {% if not notif.is_read %}
+          <span class="inline-block w-2 h-2 rounded-full
+            {% if notif.notification_type == 'warning' or notif.notification_type == 'urgent' %}bg-yellow-500
+            {% elif notif.notification_type == 'commission' %}bg-green-500
+            {% else %}bg-blue-500{% endif %}"></span>
+        {% endif %}
+      </div>
+
+      <!-- View button -->
+      {% if notif.link %}
+      <div class="flex-shrink-0 self-center">
+        <a href="{{ notif.link }}"
+           class="inline-flex items-center px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors
+             {% if notif.notification_type == 'warning' or notif.notification_type == 'urgent' %}bg-yellow-100 text-yellow-800 hover:bg-yellow-200
+             {% elif notif.notification_type == 'commission' %}bg-green-100 text-green-800 hover:bg-green-200
+             {% else %}bg-blue-100 text-blue-800 hover:bg-blue-200{% endif %}">
+          View
+        </a>
+      </div>
+      {% endif %}
+    </div>
+    {% empty %}
+    <div class="px-5 py-12 text-center text-gray-400">
+      <i class="fas fa-bell-slash text-4xl mb-3 block"></i>
+      <p class="text-sm">You have no notifications.</p>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- Pagination -->
+  {% if page_obj.paginator.num_pages > 1 %}
+  <div class="flex items-center justify-center gap-2 mt-6 flex-wrap">
+    {% if page_obj.has_previous %}
+      <a href="?page=1"
+         class="px-3 py-1.5 text-sm font-medium rounded-lg bg-white border border-gray-200 text-gray-600 hover:bg-gray-50">
+        &laquo; First
+      </a>
+      <a href="?page={{ page_obj.previous_page_number }}"
+         class="px-3 py-1.5 text-sm font-medium rounded-lg bg-white border border-gray-200 text-gray-600 hover:bg-gray-50">
+        &lsaquo; Prev
+      </a>
+    {% endif %}
+
+    <span class="px-3 py-1.5 text-sm font-semibold rounded-lg bg-blue-600 text-white">
+      {{ page_obj.number }}
+    </span>
+
+    {% if page_obj.has_next %}
+      <a href="?page={{ page_obj.next_page_number }}"
+         class="px-3 py-1.5 text-sm font-medium rounded-lg bg-white border border-gray-200 text-gray-600 hover:bg-gray-50">
+        Next &rsaquo;
+      </a>
+      <a href="?page={{ page_obj.paginator.num_pages }}"
+         class="px-3 py-1.5 text-sm font-medium rounded-lg bg-white border border-gray-200 text-gray-600 hover:bg-gray-50">
+        Last &raquo;
+      </a>
+    {% endif %}
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}
