@@ -383,7 +383,10 @@ def _prepare_html_with_tailwind(html_content, logo_path=None):
         .h-16 { height: 4rem; }
         .w-auto { width: auto; }
         .w-4 { width: 1rem; }
-        
+        .w-1\/2 { width: 50%; }
+        .w-1\/3 { width: 33.333333%; }
+        .align-top { vertical-align: top; }
+
         /* Spacing */
         .space-y-2 > * + * { margin-top: 0.5rem; }
         .space-y-1 > * + * { margin-top: 0.25rem; }
@@ -1560,15 +1563,26 @@ def invoice_pdf(request, invoice_id):
         logo_path = os.path.join(static_dir, 'media', 'LOGO.png')
         
         # Add PDF-specific context to show logo properly
+        logo_file_url = f'file:///{logo_path.replace(chr(92), "/")}' if os.path.exists(logo_path) else ''
+
+        # Build file:/// URLs for signature images so WeasyPrint can load them
+        def _sig_file_url(filename):
+            p = os.path.join(static_dir, 'media', filename)
+            return f'file:///{p.replace(chr(92), "/")}' if os.path.exists(p) else ''
+
         context.update({
             'is_pdf_generation': True,
-            'logo_path': f'file:///{logo_path.replace(chr(92), "/")}' if os.path.exists(logo_path) else None,
+            'logo_path': logo_file_url,
+            'company_logo_path': logo_file_url,
+            'prepared_by_signature_url': _sig_file_url('shiela-esign.jpeg'),
+            'checked_by_signature_url': _sig_file_url('cha-esign.jpeg'),
+            'approved_by_signature_url': _sig_file_url('gab-esign.jpeg'),
         })
         
         print(f"Generating pixel-perfect PDF for invoice {invoice.invoice_no}")
         
         # Render the complete HTML template
-        html_string = render_to_string("invoice.html", context, request=request)
+        html_string = render_to_string("invoice_pdf.html", context, request=request)
         print("HTML template rendered successfully")
         
         # Clean HTML and embed Tailwind CSS directly
@@ -1589,22 +1603,16 @@ def invoice_pdf(request, invoice_id):
         print_css = CSS(string="""
             @page {
                 size: A4;
-                margin: 0.1in;
+                margin: 0.3in;
                 -webkit-print-color-adjust: exact;
                 print-color-adjust: exact;
             }
-            
-            html {
-                zoom: 0.85;
-                transform: scale(0.85);
-                transform-origin: top center;
-            }
-            
+
             body {
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
                 color-adjust: exact !important;
-                font-size: 0.95em !important;
+                font-size: 12.5px !important;
                 line-height: 1.3 !important;
                 margin: 0 auto !important;
                 max-width: 100% !important;
@@ -1796,12 +1804,6 @@ def invoice_pdf(request, invoice_id):
                     color: #666;
                     margin-top: 5px;
                 }
-            }
-            
-            /* Force all content to stay on one page */
-            * {
-                page-break-inside: avoid !important;
-                break-inside: avoid !important;
             }
             
             body, html {

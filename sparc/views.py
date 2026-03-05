@@ -2067,8 +2067,8 @@ def commission_view(request, slip_id=None):
     if slip_id:
         slip = get_object_or_404(CommissionSlip, id=slip_id)
         
-        # For superusers, allow viewing all commission slips
-        if request.user.is_superuser:
+        # For superusers and staff, allow viewing all commission slips
+        if request.user.is_superuser or request.user.is_staff:
             details = CommissionDetail.objects.filter(slip=slip)
             all_slips = CommissionSlip.objects.all().order_by('-id')
 
@@ -2769,7 +2769,7 @@ def commission_view2(request, slip_id):
         return redirect('signin')
 
     # Check if user has permission to view commission slip 2
-    if not (request.user.is_superuser or request.user.profile.role in ['Sales Manager', 'Sales Supervisor']):
+    if not (request.user.is_superuser or request.user.is_staff or request.user.profile.role in ['Sales Manager', 'Sales Supervisor']):
         messages.error(request, 'You do not have permission to view this page.')
         return redirect('home')
 
@@ -2777,8 +2777,8 @@ def commission_view2(request, slip_id):
     details = CommissionDetail.objects.filter(slip=slip)
 
     # Get slips based on user role
-    if request.user.is_superuser:
-        # Superusers can see all slips
+    if request.user.is_superuser or request.user.is_staff:
+        # Superusers and staff can see all slips
         all_slips = CommissionSlip.objects.all().order_by('-id')
     elif request.user.profile.role == 'Sales Manager':
         # Managers can see their team's slips
@@ -3525,8 +3525,8 @@ def view_receivable_voucher(request, release_number):
         messages.error(request, 'Receivable not found.')
         return redirect('receivables')
     
-    # Check permissions - users can only view their own receivables unless superuser
-    if not request.user.is_superuser and commission_entry.agent != request.user:
+    # Check permissions - users can only view their own receivables unless superuser or staff
+    if not (request.user.is_superuser or request.user.is_staff) and commission_entry.agent != request.user:
         messages.error(request, 'You do not have permission to view this receivable.')
         return redirect('receivables')
     
@@ -6567,10 +6567,10 @@ def commission3(request, slip_id):
     # Always get all details for commission rate calculation to ensure accuracy
     all_details_for_rate = CommissionDetail3.objects.filter(slip=slip)
     
-    if request.user.is_superuser:
-        # Superuser: Show total commission rate (sum of all positions)
+    if request.user.is_superuser or request.user.is_staff:
+        # Superuser/staff: Show total commission rate (sum of all positions)
         display_commission_rate = sum(detail.commission_rate for detail in all_details_for_rate)
-    elif request.user.is_staff and hasattr(request.user, 'profile') and request.user.profile.role == 'Sales Manager':
+    elif hasattr(request.user, 'profile') and request.user.profile.role == 'Sales Manager':
         # Sales Manager: Show sum of visible details
         display_commission_rate = sum(detail.commission_rate for detail in filtered_details)
     elif hasattr(request.user, 'profile') and request.user.profile.role == 'Sales Supervisor' and request.user.get_full_name() == slip.supervisor_name:

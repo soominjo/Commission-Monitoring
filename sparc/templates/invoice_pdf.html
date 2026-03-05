@@ -5,77 +5,116 @@
 <head>
   <meta charset="UTF-8">
   <title>Invoice {{ invoice.invoice_no }}</title>
-  <script src="https://cdn.tailwindcss.com"></script>
   <style>
     @page {
       size: A4;
-      margin: 0.5in;
+      margin: 0.35in 0.45in;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
     }
-    
+
     body {
+      font-size: 10px !important;
+      line-height: 1.3 !important;
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
     }
-    
-    .bg-blue-600 {
-      background-color: #2563eb !important;
-      color: white !important;
-    }
+
+    .bg-blue-600 { background-color: #2563eb !important; color: white !important; }
+
+    /* ── compact spacing overrides ── */
+    .my-10  { margin-top: 0 !important; margin-bottom: 0 !important; }
+    .p-8    { padding: 0.5rem !important; }
+    .p-4    { padding: 0.35rem 0.5rem !important; }
+    .p-3    { padding: 0.3rem 0.45rem !important; }
+    .p-2    { padding: 0.2rem 0.35rem !important; }
+    .pb-6   { padding-bottom: 0.4rem !important; }
+    .pt-6   { padding-top:    0.4rem !important; }
+    .pl-4   { padding-left:   0.6rem !important; }
+    .mb-6   { margin-bottom:  0.4rem !important; }
+    .mb-8   { margin-bottom:  0.4rem !important; }
+    .mb-2   { margin-bottom:  0.15rem !important; }
+    .mt-6   { margin-top:     0.3rem !important; }
+    .mt-10  { margin-top:     0.5rem !important; }
+    .mt-4   { margin-top:     0.25rem !important; }
+    .mt-2   { margin-top:     0.15rem !important; }
+
+    /* ── typography ── */
+    .text-2xl { font-size: 1rem   !important; line-height: 1.2 !important; }
+    .text-xl  { font-size: 0.9rem !important; }
+    .text-lg  { font-size: 0.85rem !important; }
+    .text-sm  { font-size: 0.8rem !important; }
+    .text-xs  { font-size: 0.72rem !important; }
+
+    /* ── logo & signatures ── */
+    .h-16 { height: 2.4rem !important; }
+    img[alt$="Signature"] { height: 44px !important; margin-bottom: 0.2rem !important; }
+
+    /* ── footer ── */
+    .bg-gray-100.p-4 { padding: 0.35rem 0.5rem !important; }
   </style>
 </head>
-<body class="bg-gray-100 font-sans">
-  <div class="max-w-4xl mx-auto my-10 p-8 bg-white rounded-lg shadow-2xl">
+<body class="bg-white font-sans">
+  <div class="max-w-4xl mx-auto my-2 p-6 bg-white" style="margin:0;padding:0;box-shadow:none;border-radius:0;">
     <!-- Header -->
-    <header class="flex justify-between items-start pb-6 border-b-2 border-gray-200">
-      <div class="flex items-center">
-        <img src="{{ company_logo_path }}" alt="Inner Sparc Realty Logo" class="h-16 mr-4">
-        <div>
-          <h1 class="text-2xl font-bold text-gray-800">INNER SPARC REALTY CORPORATION</h1>
-          <p class="text-sm text-blue-600 font-semibold">Professional Real Estate Services</p>
-          <div class="mt-4 text-xs text-gray-500">
-            <p class="flex items-center"><i class="fas fa-map-marker-alt w-4 mr-1"></i> BLK 26 LOT 4 PH 3 AVIDA RESIDENCES STA CATALINA SALAWAG, <br> DASMARIÑAS CITY, CAVITE 4114</p> <br>
-            <p class="flex items-center"><i class="fas fa-id-card w-4 mr-1"></i> TIN 625-453-930-00000</p>
+    <table class="w-full pb-4 border-b-2 border-gray-200 mb-4" style="padding-bottom:0.35rem;margin-bottom:0.35rem;">
+      <tr>
+        <td class="align-top">
+          <div class="flex items-center">
+            <img src="{{ company_logo_path }}" alt="Inner Sparc Realty Logo" class="h-16 mr-4">
+            <div>
+              <h1 class="text-2xl font-bold text-gray-800">INNER SPARC REALTY CORPORATION</h1>
+              <p class="text-sm text-blue-600 font-semibold">Professional Real Estate Services</p>
+              <div class="mt-4 text-xs text-gray-500">
+                <p class="flex items-center"><i class="fas fa-map-marker-alt w-4 mr-1"></i> BLK 26 LOT 4 PH 3 AVIDA RESIDENCES STA CATALINA SALAWAG, <br> DASMARIÑAS CITY, CAVITE 4114</p> <br>
+                <p class="flex items-center"><i class="fas fa-id-card w-4 mr-1"></i> TIN 625-453-930-00000</p>
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
-      <div class="text-right">
-        <div class="px-6 py-2 bg-blue-600 text-white font-bold text-lg rounded-md shadow-md">
-          BILLING STATEMENT
-        </div>
-        <div class="mt-4 p-3 bg-gray-50 border border-gray-300 rounded-md">
-          <p class="text-xs font-semibold text-gray-500">BILLING #</p>
-          <p class="text-xl font-bold text-gray-800">{{ invoice.invoice_no }}</p>
-        </div>
-      </div>
-    </header>
+        </td>
+        <td class="align-top text-right">
+          <div class="px-6 py-2 bg-blue-600 text-white font-bold text-lg rounded-md shadow-md">
+            BILLING STATEMENT
+          </div>
+          <div class="mt-4 p-3 bg-gray-50 border border-gray-300 rounded-md">
+            <p class="text-xs font-semibold text-gray-500">BILLING #</p>
+            <p class="text-xl font-bold text-gray-800">{{ invoice.invoice_no }}</p>
+          </div>
+        </td>
+      </tr>
+    </table>
 
     <!-- Bill To & Details -->
-    <section class="grid grid-cols-2 gap-8 mt-6 pb-6">
-      <div class="border-l-4 border-blue-600 pl-4">
-        <h2 class="text-sm font-bold text-gray-500 mb-2">BILL TO</h2>
-        <p class="font-bold text-gray-800">{{ invoice.client_name }}</p>
-        <p class="text-xs text-gray-600 whitespace-pre-line">{{ invoice.client_address }}</p>
-        <p class="mt-2 text-xs text-gray-600"><span class="font-semibold">VAT-REG TIN:</span> {{ invoice.client_tin }}</p>
-        <p class="text-xs text-gray-600"><span class="font-semibold">Business Style:</span> {{ invoice.client_name }}</p>
-      </div>
-      <div class="grid grid-cols-2 gap-4 text-sm">
-        <div>
-          <h3 class="font-bold text-gray-500 mb-2">BILLING DETAILS</h3>
-          <p><span class="font-semibold">Reservation Date:</span> {{ invoice.issue_date|date:'M d, Y' }}</p>
-          <p><span class="font-semibold">Due Date:</span> {{ invoice.due_date|date:'M d, Y' }}</p>
-          <p><span class="font-semibold">Terms:</span> {{ payment_terms }}</p>
-        </div>
-        <div>
-          <h3 class="font-bold text-gray-500 mb-2">REFERENCE</h3>
-          <p>{{ invoice.reference_no }}</p>
-        </div>
-      </div>
-    </section>
+    <table class="w-full mt-6 pb-6 mb-6" style="margin-top:0.3rem;padding-bottom:0.3rem;margin-bottom:0.3rem;">
+      <tr>
+        <td class="w-1/2 align-top border-l-4 border-blue-600 pl-4 pr-4">
+          <h2 class="text-sm font-bold text-gray-500 mb-2">BILL TO</h2>
+          <p class="font-bold text-gray-800">{{ invoice.client_name }}</p>
+          <p class="text-xs text-gray-600 whitespace-pre-line">{{ invoice.client_address }}</p>
+          <p class="mt-2 text-xs text-gray-600"><span class="font-semibold">VAT-REG TIN:</span> {{ invoice.client_tin }}</p>
+          <p class="text-xs text-gray-600"><span class="font-semibold">Business Style:</span> {{ invoice.client_name }}</p>
+        </td>
+        <td class="w-1/2 align-top pl-4">
+          <table class="w-full text-sm">
+            <tr>
+              <td class="w-1/2 align-top">
+                <h3 class="font-bold text-gray-500 mb-2">BILLING DETAILS</h3>
+                <p><span class="font-semibold">Reservation Date:</span> {{ invoice.issue_date|date:'M d, Y' }}</p>
+                <p><span class="font-semibold">Due Date:</span> {{ invoice.due_date|date:'M d, Y' }}</p>
+                <p><span class="font-semibold">Terms:</span> {{ payment_terms }}</p>
+              </td>
+              <td class="w-1/2 align-top">
+                <h3 class="font-bold text-gray-500 mb-2">REFERENCE</h3>
+                <p>{{ invoice.reference_no }}</p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
 
     <!-- Items Table -->
-    <section class="mb-8">
+    <section class="mb-4" style="margin-bottom:0.35rem;">
       <table class="w-full text-sm">
         <thead class="bg-gray-50">
           <tr>
@@ -122,12 +161,12 @@
     </section>
 
     <!-- Summary & Billing History (Right Side) -->
-    <section class="grid grid-cols-2 gap-8 mb-8">
-      <!-- Empty Left Column -->
-      <div></div>
-
-      <!-- Right Column -->
-      <div class="space-y-8">
+    <table class="w-full mb-4" style="margin-bottom:0.35rem;">
+      <tr>
+        <td class="w-1/2 align-top pr-4">
+          <!-- Empty Left Column -->
+        </td>
+        <td class="w-1/2 align-top pl-4">
         <!-- Summary -->
         <div>
           <div class="border border-gray-200 rounded-lg overflow-hidden h-full">
@@ -182,8 +221,9 @@
             </div>
           </div>
         </div>
-      </div>
-    </section>
+        </td>
+      </tr>
+    </table>
 
      <!-- Billing History -->
      <div>
@@ -221,27 +261,38 @@
     </div>
 
       <!-- Authorization -->
-      <div class="grid grid-cols-3 gap-6 mt-10 pt-6 border-t border-gray-300">
-        <div class="text-center">
-          <p class="font-semibold text-dark mb-1">Prepared By</p>
-          <div class="mt-4 mb-2 border-b border-gray-400 w-4/5 mx-auto"></div>
-          <p class="font-semibold text-primary">{{ invoice.prepared_by.get_full_name|default:'-' }}</p>
-        </div>
-        <div class="text-center">
-          <p class="font-semibold text-dark mb-1">Approved By</p>
-          <div class="mt-4 mb-2 border-b border-gray-400 w-4/5 mx-auto"></div>
-          <p class="font-semibold text-primary">Inner SPARC Realty Corporation</p>
-        </div>
-        <div class="text-center">
-          <p class="font-semibold text-dark mb-1">Checked By</p>
-          <div class="mt-4 mb-2 border-b border-gray-400 w-4/5 mx-auto"></div>
-          <p class="font-semibold text-primary">Inner SPARC Realty Corporation</p>
-        </div>
-      </div>
+      <table class="w-full mt-6 pt-4 border-t border-gray-300" style="margin-top:0.5rem;padding-top:0.4rem;">
+        <tr>
+          <td class="w-1/3 align-top text-center px-2">
+            {% if prepared_by_signature_url %}
+            <img src="{{ prepared_by_signature_url }}" alt="Prepared By Signature" style="height:64px;width:auto;display:block;margin:0 auto 0.5rem auto;">
+            {% endif %}
+            <div class="mb-2 border-b border-gray-400 w-4/5 mx-auto"></div>
+            <p class="font-semibold text-xs">Prepared By</p>
+            <p class="text-xs text-gray-600">{{ invoice.prepared_by.get_full_name|default:'-' }}</p>
+          </td>
+          <td class="w-1/3 align-top text-center px-2">
+            {% if checked_by_signature_url %}
+            <img src="{{ checked_by_signature_url }}" alt="Checked By Signature" style="height:64px;width:auto;display:block;margin:0 auto 0.5rem auto;">
+            {% endif %}
+            <div class="mb-2 border-b border-gray-400 w-4/5 mx-auto"></div>
+            <p class="font-semibold text-xs">Checked By</p>
+            <p class="text-xs text-gray-600">Inner SPARC Realty Corporation</p>
+          </td>
+          <td class="w-1/3 align-top text-center px-2">
+            {% if approved_by_signature_url %}
+            <img src="{{ approved_by_signature_url }}" alt="Approved By Signature" style="height:64px;width:auto;display:block;margin:0 auto 0.5rem auto;">
+            {% endif %}
+            <div class="mb-2 border-b border-gray-400 w-4/5 mx-auto"></div>
+            <p class="font-semibold text-xs">Approved By</p>
+            <p class="text-xs text-gray-600">Inner SPARC Realty Corporation</p>
+          </td>
+        </tr>
+      </table>
     </div>
 
     <!-- Footer -->
-    <div class="bg-gray-100 p-4 text-center text-sm text-gray-600 border-t border-gray-300">
+    <div class="bg-gray-100 p-4 text-center text-sm text-gray-600 border-t border-gray-300" style="position:fixed;bottom:0;left:0;right:0;">
       <p>Thank you for your business! • Payment due by {{ invoice.due_date|date:'M d, Y' }}</p>
       <p class="mt-1">
         Contact: (046) 458-0706 • 
